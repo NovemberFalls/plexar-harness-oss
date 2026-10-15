@@ -1298,6 +1298,20 @@ describe('addHarnessSourceSection', () => {
     }
   })
 
+  it('names a caller-supplied productName in place of the default', async () => {
+    const ctx = new Context()
+    try {
+      await ctx.plugin(SystemPrompt, {})
+      addHarnessSourceSection(ctx, SOURCE_ROOT, 'Plexar Harness')
+      const systemPrompt = ctx.get('systemPrompt')!
+      const rendered = renderPrompt(await systemPrompt.assemble())
+      expect(rendered).toContain(`The Plexar Harness implementation checkout is at ${SOURCE_ROOT}.`)
+      expect(rendered).not.toContain('The DeepSeek Harness implementation checkout')
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('is a no-op returning undefined when no systemPrompt service is mounted', async () => {
     const ctx = new Context()
     try {

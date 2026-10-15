@@ -13,6 +13,7 @@ import { createServer } from 'node:net'
 import {
   applyLiteralEdit,
   listDirectory,
+  msysDrivePath,
   probe,
   probeNoFollow,
   readForEdit,
@@ -42,6 +43,18 @@ async function collect(chunks: AsyncIterable<string>): Promise<string> {
   for await (const chunk of chunks) out += chunk
   return out
 }
+
+describe('msysDrivePath', () => {
+  it('spells a Git Bash drive path as its Windows drive path', () => {
+    expect(msysDrivePath('/c/Code/Personal/README.md')).toBe('c:\\Code\\Personal\\README.md')
+    expect(msysDrivePath('/D')).toBe('D:\\')
+    expect(msysDrivePath('/c/')).toBe('c:\\')
+  })
+
+  it('leaves every other path unchanged', () => {
+    for (const path of ['/code/x', '/', 'c/Code', 'C:\\Code', '/tmp/x', './c/x']) expect(msysDrivePath(path)).toBe(path)
+  })
+})
 
 describe('resolveLocalTarget', () => {
   it('resolves a relative path from cwd and realpaths it', async () => {

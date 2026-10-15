@@ -1,0 +1,324 @@
+# @plexar/dsh-plexar — the Plexar coding bundle.
+#
+# Applies OVER dsh-base + dsh-headless (profile order: base, headless, plexar).
+# It edits no upstream file: every line here is an id-targeted override or a
+# disable against rows those two bundles already declare. Trim = compose.
+#
+# Env:
+#   PLEXAR_HARNESS_KEY  bearer key minted by the rig (required off-loopback)
+#   PLEXAR_RIG_URL      rig base, default https://llm.plexar.tech
+#   PLEXAR_MODEL        served_model_name, default Qwen/Qwen3.6-35B-A3B
+
+# ---- model route: the rig, via the OpenAI-compatible adapter --------------
+- id: llm-pi-ai
+  config:
+    providers:
+      plexar:
+        displayName: Plexar Rig
+        apiKeyEnv: PLEXAR_HARNESS_KEY
+        api: openai-completions
+        # Preselected effort; the picker lists the model's levels with no separate "Default" row.
+        reasoning: high
+        baseURL: !!js (process.env.PLEXAR_RIG_URL ?? 'https://llm.plexar.tech') + '/v1'
+        retryPolicy:
+          mode: normal
+          maxRetries: 2
+        # The launcher puts the signed-in person's serving chat models (from /api/harness/me) in
+        # PLEXAR_HARNESS_MODELS; fields plexar-llm leaves null come from the table below, which is
+        # also the whole list when the variable is absent (offline start, developer key).
+        models: !!js |-
+          (() => {
+            const known = {
+              'Qwen/Qwen3.6-35B-A3B': {
+                name: 'Qwen3.6 35B', input: ['text', 'image'], contextWindow: 262144, maxTokens: 65536,
+                compat: { thinkingFormat: 'qwen-chat-template' }, reasoningEfforts: { off: null, high: 'high' },
+              },
+              'prism-ml/Ternary-Bonsai-2-27B': { name: 'Bonsai 2 27B', input: ['text', 'image'], contextWindow: 131072, maxTokens: 32768 },
+            };
+            const fromTable = id => ({ id, ...known[id] });
+            let served;
+            try { served = JSON.parse(process.env.PLEXAR_HARNESS_MODELS ?? 'null'); } catch (error) { served = null; }
+            if (!Array.isArray(served) || served.length === 0) {
+              const pinned = process.env.PLEXAR_MODEL;
+              return pinned && !known[pinned] ? [{ id: pinned, name: pinned }, ...Object.keys(known).map(fromTable)] : Object.keys(known).map(fromTable);
+            }
+            return served.map((m) => {
+              const k = known[m.id] ?? {};
+              const efforts = Array.isArray(m.reasoning_efforts) && m.reasoning_efforts.length > 0
+                ? Object.fromEntries(m.reasoning_efforts.map(level => [level, level === 'off' || level === 'none' ? null : level]))
+                : k.reasoningEfforts;
+              return {
+                id: m.id,
+                name: m.name ?? k.name ?? m.id,
+                input: Array.isArray(m.input) ? m.input : k.input ?? ['text'],
+                contextWindow: m.context_window ?? k.contextWindow ?? 131072,
+                // Without a served or known limit, a reply may use a quarter of the window (thinking included).
+                maxTokens: m.max_output_tokens ?? k.maxTokens ?? Math.floor((m.context_window ?? k.contextWindow ?? 131072) / 4),
+                ...k.compat ? { compat: k.compat } : {},
+                ...efforts ? { reasoningEfforts: efforts } : {},
+              };
+            });
+          })()
+
+- id: agent-default-model
+  config:
+    provider: plexar
+    model: !!js process.env.PLEXAR_MODEL ?? 'Qwen/Qwen3.6-35B-A3B'
+
+# ---- persona ------------------------------------------------------------------
+- id: system-prompt
+  config:
+    # The core opener names DeepSeek Harness; Plexar introduces itself in the persona instead.
+    includeHarnessIdentity: false
+    personaPrefix: >-
+      You are Plexar Harness, a coding agent running on a self-hosted {{model}} model.
+      Work in the repository you are given. Prefer reading files and running
+      commands over guessing.
+    personaSuffix: !!js >-
+      'Your working directory is {{cwd}}.' + (process.platform === 'win32' && process.env.PLEXAR_WIN_BASH !== '0'
+        ? ' This is Windows with Git Bash: use the bash tool for shell work (POSIX syntax; paths like /c/Code/x or C:/Code/x) and the pwsh tool only for Windows-specific tasks such as the registry, services, or PowerShell modules.'
+        : '')
+
+# ---- web surface: Plexar's own product name, no developer-checkout guidance -
+# The base row names DeepSeek Harness and, in the Web-surface section, describes
+# the pnpm run dev:web HMR watcher and the apps/web Vite entry — text meant for
+# a harness developer running this checkout, not a Plexar user. N68.
+- id: web-runtime
+  config:
+    openBrowser: !!js ctx.webStartup.openBrowser
+    printUrl: true
+    surfaceContext: true
+    productName: Plexar Harness
+    developerContext: false
+    trustedHosts: !!js ctx.webStartup.trustedHosts
+
+# ---- SDK JSON-RPC surface: Plexar's own product name in the "unknown method" error. N72 ----
+- id: sdk-jsonrpc-server
+  config:
+    # A row's config replaces the base row's, so sdk-app's setting is restated here.
+    maxTokensAsSuccess: !!js "process.env.DSH_MAX_TOKENS_AS_SUCCESS === undefined ? true : JSON.parse(process.env.DSH_MAX_TOKENS_AS_SUCCESS)"
+    productName: Plexar Harness
+    serverName: plexar-harness-sdk-runtime
+
+# ---- DeepSeek-cloud rows: off. Nothing in base injects these services. -------
+- id: llm-deepseek
+  disabled: true
+- id: deepseek-llm-api-extensions
+  disabled: true
+# these two hard-inject deepseekLlmApiExtensions and would wait forever
+- id: plugin-package-inventory-deepseek
+  disabled: true
+- id: session-log-deepseek
+  disabled: true
+- id: deepseek-account
+  disabled: true
+- id: web-search-deepseek
+  disabled: true
+- id: session-telemetry-otel
+  disabled: true
+
+# ---- surface trim: no plugin marketplace, no ralph loop, no web search ------
+- id: plugin-manager
+  disabled: true
+- id: tool-plugin-manager
+  disabled: true
+- id: tool-ralph
+  disabled: true
+- id: tool-web
+  config:
+    fetch: true
+    search: false
+
+# ---- no "configure the official DeepSeek provider" onboarding ---------------
+- id: ui-settings-models
+  config:
+    credentialOnboarding: false
+    # The shipped notice is DeepSeek Harness release copy.
+    welcomeNotice: false
+
+# ---- Plexar skills: in-house SKILL.md bundles shipped with this package -------
+- id: skill-filesystem
+  config:
+    customSkillDirs:
+      - !!js (process.env.PLEXAR_HARNESS_ROOT ?? 'C:/Code/Personal/plexar-harness') + '/packages/bundle/plexar/skills'
+
+# ---- /rename <title>: session titles over any command adapter (CLI, Studio via ACP) ----
+- insert:
+    - id: plexar-command-rename
+      name: '@plexar/dsh-plexar/rename'
+
+# ---- bash on Windows: Git Bash beside pwsh, each tool with its own ctx.shell ----
+# Base disables tool-bash on win32 because its executors are POSIX-only. This
+# group mounts a Git Bash executor and a second bash tool behind an isolated
+# `shell`, so the pwsh tool keeps the pwsh executor. PLEXAR_WIN_BASH=0 turns it off.
+- insert:
+    - id: plexar-win-bash
+      name: cordis:group
+      group: true
+      disabled: !!js process.platform !== 'win32' || process.env.PLEXAR_WIN_BASH === '0'
+      isolate:
+        shell: true
+      config:
+        - id: plexar-git-bash
+          name: '@plexar/dsh-plexar/git-bash'
+        - id: plexar-tool-bash
+          name: '@deepseek-ai/dsh-tool-bash'
+
+# ---- browser QA: Playwright over MCP, in the person's Chrome or a window of its own ----
+# "Use my Chrome" (Features switch useMyChrome, on by default) connects each session to the
+# person's Chrome through the Plexar Browser Bridge extension; without it within
+# connectTimeoutMs, a visible Chromium window is launched. PLEXAR_BROWSER_HEADLESS=1 hides that window.
+- insert:
+    - id: plexar-browser-use
+      name: '@deepseek-ai/dsh-browser-use'
+    - id: plexar-browser-playwright
+      name: '@plexar/dsh-plexar/browser-bridge'
+      config:
+        connectTimeoutMs: 60000
+        # The store build first, then a load-unpacked development build.
+        extensionIds: [gnjeciecdiicngbfdancnklpnnmcekll, cnfgenfphpnhddlefhminclbbjdgkbbd]
+        headless: !!js process.env.PLEXAR_BROWSER_HEADLESS === '1'
+
+# ---- no OS sandbox: shell commands run unconfined and ask first ----------------
+# The base bundle confines every shell command (bwrap/Seatbelt/Windows ACL runner).
+# Plexar follows the Claude Code model instead: commands run as the user, and
+# plexar-command-approval asks before each one unless it matches `allow` or a
+# /allow prefix; danger-full-access (full-access mode) never asks. File edits keep
+# the in-process workspace policy of the edit/write tools.
+- id: bash-sandbox
+  disabled: true
+- id: pwsh-sandbox
+  disabled: true
+- id: permission
+  config:
+    shellConfinement: none
+    # With no confining shell the default cannot be inferred from the executor.
+    defaultPreset: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'
+    # A row's config replaces the base row's config, so the table is restated in full:
+    # the three CLI modes (ask / auto-edit / full-access), in that order.
+    presets:
+      read-only:
+        sandbox: read-only
+        approval: ask
+        name: Ask
+        description: Asks before every edit and every command.
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask
+        name: Auto-edit
+        description: Edits in this folder freely; asks before commands and outside edits.
+      danger-full-access:
+        sandbox: danger-full-access
+        approval: never
+        name: Full access
+        description: 'Caution: runs every command and edit without asking, anywhere on this computer. Use only in a folder you can afford to lose.'
+- insert:
+    - id: plexar-bash-local
+      name: '@deepseek-ai/dsh-bash-local'
+      disabled: !!js process.platform === 'win32'
+      config:
+        timeoutMs: 60000
+    - id: plexar-pwsh-local
+      name: '@deepseek-ai/dsh-pwsh-local'
+      disabled: !!js process.platform !== 'win32'
+    # Settings > Features tool switches. `off` is the user's setting (every feature on by default);
+    # each feature lists the tool names it hides from newly created agents.
+    - id: plexar-feature-toggles
+      name: '@plexar/dsh-plexar/feature-toggles'
+      config:
+        features:
+          shell: [bash, pwsh]
+          files: [read, read_image, write, edit, glob, grep]
+          webSearch: [web_search, web_fetch]
+          subagents: [subagent, subagent_fork, list_subagent_models, send_message, list_agents, interrupt_agent]
+          workflows: [workflow]
+          todos: [todo_write]
+          goals: [create_goal, get_goal, update_goal]
+          jobs: [job_output, job_kill, job_list]
+          skills: [skill]
+          # No tools: plexar-browser-bridge reads this id to choose the person's Chrome or its own window.
+          useMyChrome: []
+    - id: plexar-command-approval
+      name: '@plexar/dsh-plexar/command-approval'
+      config:
+        allow:
+          - ls
+          - pwd
+          - cat
+          - head
+          - tail
+          - wc
+          - grep
+          - rg
+          - echo
+          - which
+          - file
+          - stat
+          - du
+          - diff
+          - git status
+          - git diff
+          - git log
+          - git show
+          - git branch
+          - git rev-parse
+          - pytest
+          - python -m pytest
+          - npm test
+          - pnpm test
+          - node --version
+          - python --version
+          - Get-ChildItem
+          - Get-Content
+          - Get-Location
+          - Test-Path
+          - Select-String
+
+# ---- update service: exposes plexarUpdate over Remote for the sidebar notice ----
+- insert:
+    - id: plexar-update
+      name: '@plexar/dsh-plexar/update'
+      config:
+        checkIntervalMs: 3600000
+
+# ---- auth service: exposes plexarAuth over Remote for the Settings Account block. N67. ----
+- insert:
+    - id: plexar-auth
+      name: '@plexar/dsh-plexar/auth-remote'
+
+# ---- models service: exposes plexarModels over Remote for the Models settings page. Reads the
+# launcher's PLEXAR_HARNESS_ALL_MODELS snapshot; harmless (unavailable, empty lists) when unset,
+# so it is loaded unconditionally by both plexar-web and headless. N60.
+- insert:
+    - id: plexar-models
+      name: '@plexar/dsh-plexar/models'
+
+# ---- rig mid-session revocation (contract §10p): a /v1 403 whose body names
+# error.code "product_not_granted" means the rig revoked harness access after
+# sign-in; stop the turn without retry and surface the pinned copy instead of
+# the raw provider failure text. N59.
+- insert:
+    - id: plexar-revocation
+      name: '@plexar/dsh-plexar/revocation'
+
+# ---- document tools: read_file/find_in_file/query_sheet/convert_document/extract_document/
+# create_document over MCP stdio, by file path. Spawns python/tools' plexar_tools.harness_mcp
+# (chat-DEC-397 — stdlib-only, no venv), which resolves every `path`/`sources` argument against
+# PLEXAR_TOOLS_ROOT and refuses one outside it. PLEXAR_PYTHON overrides the interpreter; the
+# default is `python` on Windows and `python3` elsewhere, found on PATH. A missing or below-3.12
+# Python only drops these six tools — failOnStartupError stays false so Harness still starts. N90.
+- insert:
+    - id: plexar-document-tools
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        transport: stdio
+        serverName: plexar-doc
+        command: !!js "process.env.PLEXAR_PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3')"
+        args: ['-m', 'plexar_tools.harness_mcp']
+        cwd: !!js process.cwd()
+        env:
+          # The plexar-harness launcher always sets PLEXAR_HARNESS_ROOT; without it the server fails to start and
+          # the session runs without these tools (failOnStartupError: false).
+          PYTHONPATH: !!js (process.env.PLEXAR_HARNESS_ROOT ?? '') + '/python/tools/src'
+          PLEXAR_TOOLS_ROOT: !!js process.cwd()
+        failOnStartupError: false

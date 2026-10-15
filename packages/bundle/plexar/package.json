@@ -1,0 +1,132 @@
+{
+  "name": "@plexar/dsh-plexar",
+  "description": "Plexar coding profile: dsh-base + dsh-headless routed to the Plexar rig (Qwen/Qwen3.6-35B-A3B), with every DeepSeek-cloud row switched off",
+  "version": "0.4.4",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./rename": {
+      "types": "./lib/types/rename.d.ts",
+      "default": "./lib/types/rename.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./git-bash": {
+      "types": "./lib/types/git-bash.d.ts",
+      "default": "./lib/types/git-bash.js"
+    },
+    "./command-approval": {
+      "types": "./lib/types/command-approval.d.ts",
+      "default": "./lib/types/command-approval.js"
+    },
+    "./feature-toggles": {
+      "types": "./lib/types/feature-toggles.d.ts",
+      "default": "./lib/types/feature-toggles.js"
+    },
+    "./revocation": {
+      "types": "./lib/types/revocation.d.ts",
+      "default": "./lib/types/revocation.js"
+    },
+    "./update": {
+      "types": "./lib/types/update.d.ts",
+      "default": "./lib/types/update.js"
+    },
+    "./auth-remote": {
+      "types": "./lib/types/auth-remote.d.ts",
+      "default": "./lib/types/auth-remote.js"
+    },
+    "./models": {
+      "types": "./lib/types/models.d.ts",
+      "default": "./lib/types/models.js"
+    },
+    "./browser-bridge": {
+      "types": "./lib/types/browser-bridge/index.d.ts",
+      "default": "./lib/types/browser-bridge/index.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts",
+    "cordis.patch.yml",
+    "lib/types/rename.js",
+    "lib/types/git-bash.js",
+    "lib/types/command-approval.js",
+    "lib/types/feature-toggles.js",
+    "lib/types/revocation.js",
+    "lib/types/update.js",
+    "lib/types/auth-remote.js",
+    "lib/types/models.js",
+    "lib/types/browser-bridge/*.js",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "dependencies": {
+    "zod": "^4.4.3",
+    "@napi-rs/keyring": "^2.1.0",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-commands": "workspace:*",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:*",
+    "@deepseek-ai/dsh-session-title": "workspace:*",
+    "@deepseek-ai/dsh-shell": "workspace:*",
+    "@deepseek-ai/dsh-pwsh-local": "workspace:*",
+    "@deepseek-ai/dsh-browser-use": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-runtime": "workspace:*",
+    "@deepseek-ai/dsh-bash-local": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-sandbox-policy": "workspace:*",
+    "@deepseek-ai/dsh-scope": "workspace:*",
+    "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-settings": "workspace:*",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
+    "@deepseek-ai/schemastery": "workspace:~",
+    "@types/ws": "^8.18.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:~",
+    "@deepseek-ai/dsh-commands": "workspace:*",
+    "@deepseek-ai/dsh-session-title": "workspace:*",
+    "@deepseek-ai/dsh-shell": "workspace:*",
+    "@deepseek-ai/dsh-pwsh-local": "workspace:*",
+    "@deepseek-ai/dsh-browser-use": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-playwright-mcp": "workspace:*",
+    "@deepseek-ai/dsh-experimental-browser-use-runtime": "workspace:*",
+    "@deepseek-ai/dsh-bash-local": "workspace:*",
+    "@deepseek-ai/dsh-tools": "workspace:*",
+    "@deepseek-ai/dsh-session": "workspace:*",
+    "@deepseek-ai/dsh-sandbox-policy": "workspace:*",
+    "@deepseek-ai/dsh-scope": "workspace:*",
+    "@deepseek-ai/dsh-agent": "workspace:*",
+    "@deepseek-ai/dsh-llm": "workspace:*",
+    "@deepseek-ai/dsh-settings": "workspace:*",
+    "@deepseek-ai/dsh-typert-protocol": "workspace:*",
+    "@deepseek-ai/schemastery": "workspace:~"
+  }
+}

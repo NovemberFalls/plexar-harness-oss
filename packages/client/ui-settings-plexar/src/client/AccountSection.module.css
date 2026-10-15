@@ -1,0 +1,75 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 8px;
+}
+
+.heading {
+  margin: 0 0 4px;
+}
+
+.status {
+  margin: 0;
+  opacity: 0.85;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.confirmText {
+  margin: 0;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 10px;
+}
+
+.signOutButton {
+  border: 1px solid rgba(255, 154, 138, 0.4);
+  border-radius: 8px;
+  padding: 6px 14px;
+  background: rgba(255, 154, 138, 0.12);
+  color: #ff9b8a;
+  font: inherit;
+  cursor: pointer;
+}
+
+.signOutButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cancelButton {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 6px 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cancelButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

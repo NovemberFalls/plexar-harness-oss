@@ -60,6 +60,16 @@ function subagentParentOf(carrier: Scoped<SubagentRuntime>): Agent {
 export interface HarnessSdkJsonRpcServerOptions {
   /** Report max-token termination as an accepted result instead of an infrastructure error. */
   maxTokensAsSuccess?: boolean
+  /**
+   * Deployment name rendered in the "unknown method" JSON-RPC error (default `'DeepSeek Harness'`);
+   * unset reproduces upstream's error text byte-for-byte.
+   */
+  productName?: string
+  /**
+   * `initialize` response `serverInfo.name` (default `'deepseek-harness-sdk-runtime'`);
+   * unset reproduces upstream's wire identity byte-for-byte.
+   */
+  serverName?: string
 }
 
 function successStatus(reason: string, options: HarnessSdkJsonRpcServerOptions): 'ok' | 'error' {
@@ -167,7 +177,7 @@ export class HarnessSdkJsonRpcServer {
     this.reasoningEffort = reasoningEffort
     this.maxTokens = params.maxTokens
     this.initialized = true
-    return { serverInfo: { name: 'deepseek-harness-sdk-runtime', version: '0.0.1' } }
+    return { serverInfo: { name: this.options.serverName ?? 'deepseek-harness-sdk-runtime', version: '0.0.1' } }
   }
 
   /**
@@ -254,7 +264,7 @@ export class HarnessSdkJsonRpcServer {
       case 'shutdown':
         return this.shutdown()
       default:
-        throw new Error(`unknown DeepSeek Harness SDK runtime method: ${method}`)
+        throw new Error(`unknown ${this.options.productName ?? 'DeepSeek Harness'} SDK runtime method: ${method}`)
     }
   }
 

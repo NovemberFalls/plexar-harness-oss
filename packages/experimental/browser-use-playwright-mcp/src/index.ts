@@ -25,20 +25,7 @@ export const Config: typeof BrowserMcpConfig = BrowserMcpConfig
  */
 export function apply(ctx: Context, config: Config): void {
   validateBrowserMcpConfig(config)
-  const cli = join(dirname(fileURLToPath(import.meta.resolve('@playwright/mcp/package.json'))), 'cli.js')
-  // Upstream environment options can otherwise replace the configured browser
-  // mode or import an unrelated profile. Empty values mean absent to its parser.
-  const env = Object.fromEntries(Object.keys(process.env)
-    .filter(key => key.toUpperCase().startsWith('PLAYWRIGHT_MCP_'))
-    .map(key => [key, '']))
-  const args = [cli, '--browser', 'chromium']
-  if (config.mode === 'attach') {
-    args.push('--cdp-endpoint', config.endpoint)
-  } else {
-    args.push('--isolated')
-    if (config.headless) args.push('--headless')
-    if (config.executablePath !== undefined) args.push('--executable-path', config.executablePath)
-  }
+  const { args, env } = playwrightMcpLaunch(config)
   mountSessionMcp(ctx, {
     name: 'playwright-mcp',
     exclusive: config.mode === 'attach',
@@ -47,4 +34,41 @@ export function apply(ctx: Context, config: Config): void {
     env,
     ...config.toolCallTimeoutMs === undefined ? {} : { toolCallTimeoutMs: config.toolCallTimeoutMs },
   })
+}
+
+/** Name of the upstream environment variable holding the CDP endpoint to attach to. */
+export const CDP_ENDPOINT_ENV = 'PLAYWRIGHT_MCP_CDP_ENDPOINT'
+
+/**
+ * Server arguments and environment for one browser choice, run under `process.execPath`.
+ * @param config - validated launch or attachment choice.
+ * @param options.endpointInEnv - in attach mode, pass the endpoint as `PLAYWRIGHT_MCP_CDP_ENDPOINT` in the child
+ *   environment instead of `--cdp-endpoint`, so process listings of other local users do not show it; default false.
+ * @returns the pinned server entry plus its arguments, and the environment clearing upstream options.
+ */
+export function playwrightMcpLaunch(
+  config: Config,
+  options: { endpointInEnv?: boolean } = {},
+): { args: string[]; env: Record<string, string> } {
+  const cli = join(dirname(fileURLToPath(import.meta.resolve('@playwright/mcp/package.json'))), 'cli.js')
+  // Upstream environment options can otherwise replace the configured browser
+  // mode or import an unrelated profile. Empty values mean absent to its parser.
+  const endpointInEnv = config.mode === 'attach' && options.endpointInEnv === true
+  const env: Record<string, string> = Object.fromEntries(Object.keys(process.env)
+    .filter(key => key.toUpperCase().startsWith('PLAYWRIGHT_MCP_'))
+    .filter(key => !(endpointInEnv && key.toUpperCase() === CDP_ENDPOINT_ENV))
+    .map(key => [key, '']))
+  const args = [cli, '--browser', 'chromium']
+  if (config.mode === 'attach') {
+    if (endpointInEnv) {
+      env[CDP_ENDPOINT_ENV] = config.endpoint
+    } else {
+      args.push('--cdp-endpoint', config.endpoint)
+    }
+  } else {
+    args.push('--isolated')
+    if (config.headless) args.push('--headless')
+    if (config.executablePath !== undefined) args.push('--executable-path', config.executablePath)
+  }
+  return { args, env }
 }

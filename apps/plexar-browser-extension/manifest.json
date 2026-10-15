@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Plexar Browser Bridge",
+  "version": "0.2.0",
+  "description": "Lets Plexar Harness work in your own Chrome, in its own tab.",
+  "permissions": [
+    "debugger",
+    "activeTab",
+    "tabs",
+    "tabGroups"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "lib/background.mjs",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Plexar Browser Bridge",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqNlzjnmGlj8ElWwRMIwQxI6m7TqkXwbTVcJjIxD3JNF21EgzK77KjY1odckJj5sAgdmaLqkV71OElkGsU5pEHD6Gio40NCVHi08y/6Cxnj7+yVDTl+ilLpX6BQ4FLn3IUKO8RVI4kjeKkTgT/dEmaLr3llZhMrjCR4LYFo4o27WKZTDUPCSpH11xb/OCxkm2HfntoBDZVPYJVlZ/o1ajrHfRGXvpHjSkyXUDmvWPUQDx9v+RlUUUXSoLK13X1GKMNe2C/XVNkmHVaDeVXAGF5WOIZ6nFg3O1Xizda5Kv0iPYWC5doa4evYjKrk2ZRCpXb/69gJGE/AXKty7Uj5lCKwIDAQAB"
+}

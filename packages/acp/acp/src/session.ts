@@ -101,6 +101,7 @@ export class AcpSession {
   private readonly modelControl: AcpModelControl
   private outputTail = Promise.resolve()
   private inflight: InflightPrompt | undefined
+  private commandRunning = false
   private closing: Promise<void> | undefined
   private readonly pendingSelections = new Map<string, ModelSelection>()
 
@@ -246,7 +247,9 @@ export class AcpSession {
     requestSignal?: AbortSignal,
   ): Promise<PromptResponse> {
     this.assertActive()
-    if (this.inflight !== undefined) throw invalidParams('a prompt is already in flight for this session')
+    if (this.inflight !== undefined || this.commandRunning) throw invalidParams('a prompt is already in flight for this session')
+    const commandStop = await this.runCommand(params, requestSignal)
+    if (commandStop !== undefined) return { stopReason: commandStop }
     const completion = Promise.withResolvers<StopReason>()
     const admission = Promise.withResolvers<void>()
     const admissionController = new AbortController()
@@ -327,6 +330,37 @@ export class AcpSession {
       return { stopReason: await completion.promise }
     } finally {
       requestSignal?.removeEventListener('abort', onRequestAbort)
+    }
+  }
+
+  /**
+   * Run a one-line `/name [input]` text prompt through the composed command registry instead of the model.
+   * The result text is sent as one `agent_message_chunk`; the command's own `command/run` and `command/done`
+   * events record it in the session log. A prompt that is not a registered command, or a composition without
+   * `dsh-commands`, returns `undefined` and is admitted to the model unchanged.
+   * @param params - standard ACP prompt request for this session.
+   * @param requestSignal - JSON-RPC request cancellation signal.
+   * @returns `end_turn` when a command ran, otherwise `undefined`.
+   */
+  private async runCommand(params: PromptRequest, requestSignal?: AbortSignal): Promise<StopReason | undefined> {
+    const [block] = params.prompt
+    if (params.prompt.length !== 1 || block?.type !== 'text' || !block.text.startsWith('/')) return undefined
+    const commands = this.ctx.get('commands')
+    if (commands === undefined) return undefined
+    this.commandRunning = true
+    try {
+      const execution = await commands.execute(this.agent, block.text, [], requestSignal ?? new AbortController().signal)
+      if (execution === undefined) return undefined
+      const text = execution.result.text ?? (execution.result.kind === 'success' ? 'Done.' : 'Command failed.')
+      const previous = this.outputTail
+      this.outputTail = previous.then(() => this.notify({
+        sessionId: this.agent.session.id,
+        update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } },
+      }))
+      await this.outputTail
+      return 'end_turn'
+    } finally {
+      this.commandRunning = false
     }
   }
 

@@ -1,0 +1,5 @@
+target/
+gen/
+# Staged by scripts/plexar-release/stage-windows-bundle.mjs; never committed.
+plexar-runtime/*
+!plexar-runtime/.gitkeep

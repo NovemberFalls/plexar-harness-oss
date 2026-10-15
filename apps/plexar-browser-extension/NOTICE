@@ -1,0 +1,52 @@
+Plexar Browser Bridge
+Copyright (c) 2026 Plexar contributors
+
+This package is a fork of the Playwright MCP Bridge Chrome extension from
+the Microsoft Playwright project:
+
+  https://github.com/microsoft/playwright
+  Copyright (c) Microsoft Corporation.
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Forked from packages/extension at commit
+b9a34ac7783a1b6c2e1dfff0c08ac744c048fa59.
+
+Changes made in this fork:
+  - Renamed the extension to "Plexar Browser Bridge" and rebranded every
+    user-visible string (connect page, status page, action title,
+    description) to reference Plexar Harness instead of Playwright/MCP.
+  - Renamed the internal service worker class (PlaywrightExtension ->
+    PlexarBrowserBridge), the tab-group title prefix ("Playwright" ->
+    "Plexar"), and the cleanup helper (cleanupStalePlaywrightGroups ->
+    cleanupStalePlexarGroups); the connected-tab badge title now reads
+    "Connected to Plexar Harness".
+  - Replaced the light GitHub Primer color palette (colors.css) and the
+    page stylesheet (connect.css) with the Plexar dark theme, sourced from
+    packages/client/ui-brand-plexar/src/client/tokens/plexar-tokens.css
+    (accent --px-accent).
+  - Replaced the upstream icon set with apps/plexar-desktop/ui/mark.png,
+    resized to 16/32/48/128px (scripts/make-icons.mjs).
+  - Renamed the auth-token bypass environment variable
+    (PLAYWRIGHT_MCP_EXTENSION_TOKEN -> PLEXAR_BROWSER_BRIDGE_TOKEN) and the
+    version-mismatch README link.
+  - Replaced the vite + vite-plugin-static-copy build with a small esbuild
+    + hand-rolled HTML/icon copy script (scripts/build.mjs) and a
+    dependency-free ZIP writer (scripts/zip.mjs, scripts/pack.mjs), to stay
+    within the toolchain already vendored in this monorepo.
+  - Pinned the manifest "key" to this fork's own developer key so the
+    extension id is stable (cnfgenfphpnhddlefhminclbbjdgkbbd) across
+    load-unpacked installs; the Chrome Web Store will assign its own key
+    and id on first store upload (see README.md).
+  - When a client's connection closes, the tabs the client brought into its
+    group (the connect page's tab, tabs it created, popups of its tabs)
+    close and the tabs the person dragged in are ungrouped; a group that
+    Chrome deleted after its last tab closed is recreated with the same
+    style; a connect page whose connection fails closes itself.
+
+The relay<->extension wire protocol (WebSocket connect page URL params
+mcpRelayUrl, client, protocolVersion, token; the chrome.* command/event
+allow-lists in src/relayConnection.ts) is unchanged from upstream so this
+extension stays compatible with the server-side relay
+(packages/bundle/plexar/src/browser-bridge/**, forked from
+playwright-core's src/tools/mcp/cdpRelay.ts / cdpRelayV2.ts /
+extensionContextFactory.ts).

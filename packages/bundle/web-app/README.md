@@ -49,6 +49,8 @@ Most users never set these; the command-line flags feed the four settings below 
 | `openBrowser` | `true` | Open the default browser after startup; SSH launches suppress it |
 | `printUrl` | `true` | Print the `dsh web:` URL line at startup |
 | `surfaceContext` | `true` | Give the agent GUI-orientation context and expose `DSH_WEB_URL` to its shell commands |
+| `productName` | `'DeepSeek Harness'` | Product name the harness-source and Web-surface prompt sections use to name this installation |
+| `developerContext` | `true` | Include developer-workflow prompt text: the harness-source checkout section, and the HMR / `pnpm run dev:web` / apps/web Vite sentences of the Web-surface section |
 | `trustedHosts` | `[]` | Extra hosts allowed to reach the GUI from the network |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web-app) is the exhaustive source for every accepted field and its JSDoc.
@@ -130,6 +132,8 @@ Read these pages when you want to go deeper into the shared core, the browser re
 #### What the model sees
 
 When `surfaceContext` is true, the `harness:source` section identifies the on-disk Harness implementation without claiming it is the working directory, and the `app:web-surface` global section (first-party order 10100, after reusable instructions) orients the model to the GUI: the canonical local URL, the "this page" referent, the update contract (the reload receiver is always on; no-refresh reloads additionally need the `pnpm run dev:web` watcher), and the instruction not to start replacement servers. `DSH_WEB_URL` additionally appears in the managed bash environment with its description, resolved per invocation from the live server. When it is false, neither section nor the variable is registered.
+
+Both sections name this installation with `productName`, defaulting to `'DeepSeek Harness'`. `developerContext` (default `true`) gates the developer-workflow text: turning it off drops the `harness:source` section entirely and drops the HMR / `pnpm run dev:web` watcher sentence and the apps/web Vite sentence from `app:web-surface`, leaving its remaining orientation sentences (the canonical URL, the "this page" referent, the instruction not to start replacement servers) in place. A deployment whose users are never harness developers sets `productName` and turns `developerContext` off.
 
 #### Token effect
 

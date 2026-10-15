@@ -137,7 +137,20 @@ export interface LocalDirEntry {
 }
 
 /**
+ * Spell an MSYS/Git Bash drive path (`/c/Code`, `/c`) as its Windows drive path (`c:\Code`, `c:\`).
+ * Windows resolves `/c/Code` against the current drive's root as `C:\c\Code`; the bash tool's Git Bash
+ * prints `/c/...` paths, so a model reading them back would otherwise miss the file.
+ * @param path - requested path.
+ * @returns the drive spelling for a `/<letter>` or `/<letter>/...` path; any other path unchanged.
+ */
+export function msysDrivePath(path: string): string {
+  const match = /^\/([a-zA-Z])(?:\/(.*))?$/su.exec(path)
+  return match === null ? path : `${match[1]}:\\${(match[2] ?? '').replaceAll('/', '\\')}`
+}
+
+/**
  * Anchor a path using native drive semantics and POSIX physical parent traversal.
+ * On Windows an MSYS drive path (`/c/...`) names that drive ({@link msysDrivePath}).
  * @param cwd - provider base directory for relative paths.
  * @param path - non-empty requested path.
  * @returns absolute display spelling shared by target resolution and no-follow metadata.
@@ -147,7 +160,7 @@ export function localDisplayPath(cwd: string, path: string): string {
   const raw = isAbsolute(path) ? path : `${absoluteCwd}${sep}${path}`
   const physicalSpelling = /(?:^|[\\/])\.\.(?:[\\/]|$)/u.test(raw) ? raw : resolve(cwd, path)
   /* v8 ignore next -- Native Windows tests cover DOS drive-relative resolution; POSIX preserves physical traversal. */
-  return process.platform === 'win32' ? resolve(cwd, path) : physicalSpelling
+  return process.platform === 'win32' ? resolve(cwd, msysDrivePath(path)) : physicalSpelling
 }
 
 /**

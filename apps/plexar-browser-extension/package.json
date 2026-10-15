@@ -1,0 +1,25 @@
+{
+  "name": "@plexar/browser-bridge",
+  "description": "Plexar Browser Bridge: a Chrome/Edge extension so Plexar Harness can work in the person's own Chrome tabs and logins.",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.ui.json",
+    "build": "node scripts/build.mjs",
+    "pack": "node scripts/pack.mjs",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.280",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "esbuild": "^0.28.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "sharp": "^0.35.3",
+    "typescript": "^6.0.3"
+  }
+}

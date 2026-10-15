@@ -1,0 +1,45 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../ui-brand-plexar"
+    },
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../test-support/client-runtime"
+    },
+    {
+      "path": "../../api/remotes/tsconfig.client.json"
+    },
+    {
+      "path": "../locale/tsconfig.client.json"
+    },
+    {
+      "path": "../ui-renderer"
+    },
+    {
+      "path": "../ui-settings/tsconfig.client.json"
+    },
+    {
+      "path": "../ui-slots"
+    },
+    {
+      "path": "../ui-sidebar"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../bundle/plexar"
+    }
+  ]
+}

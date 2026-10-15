@@ -72,6 +72,7 @@ async function mountPlugin(
   options: {
     writeDelayMs?: number
     failFlush?: boolean
+    serverName?: string
     beforeServer?: (ctx: Context) => Promise<void> | void
   } = {},
 ): Promise<ApplyHarness> {
@@ -123,6 +124,7 @@ async function mountPlugin(
     input,
     output,
     exit,
+    ...options.serverName === undefined ? {} : { serverName: options.serverName },
   })
 
   const frames = (): Record<string, unknown>[] =>
@@ -182,6 +184,25 @@ describe('dsh-sdk-jsonrpc-server plugin apply', () => {
         result: { serverInfo: { name: 'deepseek-harness-sdk-runtime', version: '0.0.1' } },
       })
       expect(harness.exits()).toEqual([])
+    } finally {
+      await harness.dispose()
+      await rm(storageDir, { recursive: true, force: true })
+    }
+  })
+
+  it('reports a configured serverName over the injected stdio pair', async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), 'dsh-jsonrpc-apply-server-name-'))
+    vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
+    const harness = await mountPlugin(storageDir, { serverName: 'plexar-harness-sdk-runtime' })
+    try {
+      harness.send({ jsonrpc: '2.0', id: 'init-1', method: 'initialize', params: { cwd: storageDir, provider: 'deepseek-official', model: 'apply-model' } })
+
+      const response = await harness.waitForFrame(frame => frame.id === 'init-1', 'initialize response')
+      expect(response).toEqual({
+        jsonrpc: '2.0',
+        id: 'init-1',
+        result: { serverInfo: { name: 'plexar-harness-sdk-runtime', version: '0.0.1' } },
+      })
     } finally {
       await harness.dispose()
       await rm(storageDir, { recursive: true, force: true })

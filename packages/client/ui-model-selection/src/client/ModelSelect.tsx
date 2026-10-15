@@ -1,20 +1,24 @@
 /**
  * ModelSelect: the composer's named model seat (`conversation.input.model`).
- * Two-level selection per figma 496:26454's MenuDropdown: the root menu is
- * the Model / Effort row pair (label + current value + a right chevron),
- * each drilling into its own list — the provider-grouped model list over
- * the shared directory, and the effort levels. The trigger (313:14108's
- * ToggleButton) shows both: model name + effort in the caption tone.
- * While open, ↑/↓ move focus across the rows of the shown pane (wrapping; a
- * step taken while the trigger still holds focus enters at the near end), Tab
- * settles like Enter, and Escape and Shift+Tab leave a drilled pane first and
- * otherwise close back to the trigger. A drilled pane hands focus to the row
- * of the value in use, and returning to the root pane hands it back to the
- * cell that opened it. Data and submission ride the SAME per-session
- * ModelDirectory as the /model popup; exact-model reasoning metadata and the
- * selected effort come from the Host rather than a client-owned vocabulary. A
- * rejected selection announces through the shared transient Toast anchored to
- * the composer card; the in-menu strip with Retry remains the catalog-load
+ * Two independent pickers sit side by side in the seat, per figma 496:26454's
+ * MenuDropdown split into its two leaf lists (no root pane, no drilling):
+ * a model picker (313:14108's ToggleButton showing the model icon + name)
+ * that opens the provider-grouped model list directly over the shared
+ * directory (loading/error/warnings/empty states included), and an effort
+ * picker, rendered only when the current model carries reasoning metadata,
+ * that opens the effort-level list for that model directly. Picking a
+ * different model can change or remove the effort picker's option list and
+ * visibility, since `effortChoices` is derived from the current model. At
+ * most one of the two menus is open at a time. While a menu is open, ↑/↓
+ * move focus across its rows (wrapping; a step taken while the trigger still
+ * holds focus enters at the near end), Tab settles like Enter, and Escape
+ * and Shift+Tab close the menu back to its own trigger. Opening a menu hands
+ * focus to the row of the value in use, or its first row when none is
+ * checked. Data and submission ride the SAME per-session ModelDirectory as
+ * the /model popup; exact-model reasoning metadata and the selected effort
+ * come from the Host rather than a client-owned vocabulary. A rejected
+ * selection announces through the shared transient Toast anchored to the
+ * composer card; the in-menu strip with Retry remains the catalog-load
  * surface.
  */
 import {
@@ -25,15 +29,15 @@ import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
-  IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronRightOutlineRegular,
+  IconCheckOutlineRegular, IconChevronDownOutlineRegular,
   IconDataOutlineRegular, IconWarningOutlineRegular, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
 import css from './ModelSelect.module.css'
 
-/** Which pane the dropdown shows: the two-row root or one drilled-in list. */
-type Pane = 'root' | 'model' | 'effort'
+/** Which picker's menu is open, if any. */
+type Picker = 'model' | 'effort'
 
 /** One dynamic effort row; undefined means preserve the provider default. */
 interface EffortChoice {
@@ -49,7 +53,8 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * Render the composer model seat.
  * @param props - owner share (locked) + injected face (shared directory
  * store/verbs) + the standard locale seat.
- * @returns the trigger and, while open, the two-level menu.
+ * @returns the model trigger, the effort trigger (when the current model has
+ * reasoning metadata), and whichever menu is open.
  */
 export function ModelSelect(
   { locked, available, directory, load, select, t }:
@@ -59,8 +64,7 @@ export function ModelSelect(
     fn => directory.subscribe(fn),
     () => directory.getSnapshot(),
   )
-  const [open, setOpen] = useState(false)
-  const [pane, setPane] = useState<Pane>('root')
+  const [open, setOpen] = useState<Picker | null>(null)
   // The in-menu error strip serves catalog loads (its Retry re-runs the
   // load); a rejected SELECTION announces through the transient toast
   // instead, so the strip renders only while the latest failure-capable
@@ -69,11 +73,14 @@ export function ModelSelect(
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
   const toastSeq = useRef(0)
   const rootRef = useRef<HTMLDivElement | null>(null)
-  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const modelTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const effortTriggerRef = useRef<HTMLButtonElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const [menuPos, setMenuPos] = useState<CSSProperties | null>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const id = useId()
+
+  const triggerRef = open === 'effort' ? effortTriggerRef : modelTriggerRef
 
   const choices = useMemo(() => state.groups.flatMap(group =>
     group.models.map(model => ({
@@ -118,50 +125,39 @@ export function ModelSelect(
   }
 
   useEffect(() => {
-    if (!open) return
+    if (open === null) return
     const closeOutside = (event: MouseEvent): void => {
       // The portaled card is outside the trigger subtree; check both.
       if (rootRef.current?.contains(event.target as Node) === true) return
       if (menuRef.current?.contains(event.target as Node) === true) return
-      setOpen(false)
+      setOpen(null)
     }
     document.addEventListener('mousedown', closeOutside)
     return () => { document.removeEventListener('mousedown', closeOutside) }
   }, [open])
 
-  // A pane switch unmounts the row that had focus, which drops focus onto the
-  // page body — outside the card's subtree, where its key handling no longer
-  // sees a keystroke. Every switch therefore names where the keyboard lands:
-  // drilling on the pane's current value, coming back on the cell that opened
-  // the pane left.
-  const paneFocus = useRef<'drill' | 'model' | 'effort' | null>(null)
+  // Opening a menu unmounts nothing this time (each trigger keeps its own
+  // element), but the newly portaled rows still need the keyboard placed:
+  // the checked row is the value in use, and a pane without one opens on its
+  // first row.
   useEffect(() => {
-    const intent = paneFocus.current
-    paneFocus.current = null
-    if (!open || intent === null) return
-    if (intent === 'drill') {
-      // The checked row is the value in use; a pane without one opens on its
-      // first row.
-      const checked = menuRef.current?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]:not([disabled])')
-      const target = checked ?? itemRefs.current.find(item => item !== null && !item.disabled)
-      // Rows a selection in flight disabled cannot take the keyboard; the
-      // trigger does, so the card's keys still reach the menu.
-      ;(target ?? triggerRef.current)?.focus()
-      return
-    }
-    const cell = itemRefs.current[intent === 'effort' ? 1 : 0]
-    ;(cell !== null && cell !== undefined && !cell.disabled ? cell : triggerRef.current)?.focus()
-  }, [open, pane])
+    if (open === null) return
+    const checked = menuRef.current?.querySelector<HTMLElement>('[role="menuitemradio"][aria-checked="true"]:not([disabled])')
+    const target = checked ?? itemRefs.current.find(item => item !== null && !item.disabled)
+    // Rows a selection in flight disabled cannot take the keyboard; the
+    // trigger does, so the card's keys still reach the menu.
+    ;(target ?? triggerRef.current)?.focus()
+  }, [open])
 
   // Portaled placement (the Menu primitive's portal rules: fixed from the
   // anchor rect, measured before paint, clamped inside the viewport): above
-  // the trigger, right edges aligned. Depends on pane and directory state
-  // because pane switches and async catalog loads resize the card.
+  // the open picker's trigger, right edges aligned. Depends on directory
+  // state because async catalog loads resize the card.
   /* jscpd:ignore-start -- deliberate mirror of ui-primitives useAnchoredPosition:
      that hook only places from the anchor's LEFT edge, while this card aligns
      right edges (x = rect.right - width), so the measure-and-clamp plumbing repeats. */
   useLayoutEffect(() => {
-    if (!open) { setMenuPos(null); return }
+    if (open === null) { setMenuPos(null); return }
     const place = (): void => {
       /* v8 ignore next 2 -- the trigger ref is attached whenever the menu is open. */
       const rect = triggerRef.current?.getBoundingClientRect()
@@ -184,32 +180,27 @@ export function ModelSelect(
       window.removeEventListener('scroll', place, true)
       window.removeEventListener('resize', place)
     }
-  }, [open, pane, state])
+  }, [open, state])
   /* jscpd:ignore-end */
 
   if (!available) return null
 
-  const show = (): void => {
-    setPane('root')
-    setOpen(true)
+  const showModel = (): void => {
+    setOpen('model')
     reload()
   }
 
+  const showEffort = (): void => {
+    setOpen('effort')
+  }
+
   const close = (restoreFocus = false): void => {
-    setOpen(false)
-    setPane('root')
-    if (restoreFocus) queueMicrotask(() => { triggerRef.current?.focus() })
-  }
-
-  const drill = (next: Pane): void => {
-    paneFocus.current = 'drill'
-    setPane(next)
-  }
-
-  /** Leave a drilled pane for the root one, handing the keyboard back to its cell. */
-  const back = (from: Exclude<Pane, 'root'>): void => {
-    paneFocus.current = from
-    setPane('root')
+    const closing = open
+    setOpen(null)
+    if (restoreFocus) {
+      const target = closing === 'effort' ? effortTriggerRef : modelTriggerRef
+      queueMicrotask(() => { target.current?.focus() })
+    }
   }
 
   const moveFocus = (offset: number): void => {
@@ -226,22 +217,19 @@ export function ModelSelect(
   }
 
   const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape' && open) {
+    if (event.key === 'Escape' && open !== null) {
       event.preventDefault()
-      // Escape backs out of a drilled pane first, then closes.
-      if (pane !== 'root') back(pane)
-      else close(true)
+      close(true)
       return
     }
-    if (!open) return
+    if (open === null) return
     // Tab settles like Enter and Shift+Tab leaves like Escape, so the menu's
     // keys mean what they mean in the composer. Both are consumed: the card
     // keeps the browser's focus traversal out while it is open.
     if (event.key === 'Tab') {
       if (event.shiftKey) {
         event.preventDefault()
-        if (pane !== 'root') back(pane)
-        else close(true)
+        close(true)
         return
       }
       // Settling activates the row the keyboard is on; with focus still on the
@@ -320,14 +308,14 @@ export function ModelSelect(
     ? t('trigger.loading')
     : currentChoice?.model.name
       ?? (state.current === null ? t('trigger.fallback') : `${state.current.provider}/${state.current.model}`)
-  const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
-  const triggerAria = waiting
+  const modelTriggerAria = waiting
     ? t('trigger.loading')
     : state.current === null
       ? t('trigger.selectAria')
-      : effortLabel === undefined
-        ? t('trigger.aria', { model: modelLabel })
-        : t('trigger.ariaEffort', { model: modelLabel, effort: effortLabel })
+      : t('trigger.aria', { model: modelLabel })
+  const effortTriggerAria = effortLabel === undefined
+    ? undefined
+    : t('trigger.effortAria', { effort: effortLabel })
   itemRefs.current = []
   let itemIndex = 0
   const itemRef = () => {
@@ -338,60 +326,60 @@ export function ModelSelect(
   return (
     <div ref={rootRef} className={css.root} onKeyDown={onRootKeyDown} onBlur={onBlur}>
       <button
-        ref={triggerRef}
+        ref={modelTriggerRef}
         type="button"
         className={css.trigger}
-        aria-label={triggerAria}
+        aria-label={modelTriggerAria}
         aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? `${id}-menu` : undefined}
-        title={triggerLabel}
+        aria-expanded={open === 'model'}
+        aria-controls={open === 'model' ? `${id}-menu` : undefined}
+        title={modelLabel}
         disabled={locked}
         onClick={() => {
-          if (open) {
-            close()
-          } else {
-            show()
-          }
+          if (open === 'model') close()
+          else showModel()
         }}
       >
         <IconDataOutlineRegular className={css.triggerIcon} size={16} />
         <span className={css.triggerLabel}>{modelLabel}</span>
-        {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
-        <IconChevronDownOutlineRegular className={clsx(css.chevron, open && css.chevronOpen)} />
+        <IconChevronDownOutlineRegular className={clsx(css.chevron, open === 'model' && css.chevronOpen)} />
       </button>
+
+      {effortLabel !== undefined && (
+        <button
+          ref={effortTriggerRef}
+          type="button"
+          className={clsx(css.trigger, css.effortTrigger)}
+          aria-label={effortTriggerAria}
+          aria-haspopup="menu"
+          aria-expanded={open === 'effort'}
+          aria-controls={open === 'effort' ? `${id}-menu` : undefined}
+          title={effortLabel}
+          disabled={locked}
+          onClick={() => {
+            if (open === 'effort') close()
+            else showEffort()
+          }}
+        >
+          <span className={css.triggerEffort}>{effortLabel}</span>
+          <IconChevronDownOutlineRegular className={clsx(css.chevron, open === 'effort' && css.chevronOpen)} />
+        </button>
+      )}
 
       {/* Portaled to body (Menu primitive's portal mode) so the sidebar and
           column overflow clips cannot crop the card; synthetic events still
           bubble through this React subtree, keeping onKeyDown/onBlur live. */}
-      {open && createPortal(
+      {open !== null && createPortal(
         <div
           ref={menuRef}
           id={`${id}-menu`}
           className={css.menu}
           style={menuPos ?? MEASURE_STYLE}
           role="menu"
-          aria-label={t('menu.aria')}
+          aria-label={open === 'model' ? t('menu.model') : t('menu.effort')}
           aria-busy={state.status === 'loading' || busy}
         >
-          {pane === 'root' && (
-            <>
-              <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { drill('model') }}>
-                <span className={css.cellLabel}>{t('menu.model')}</span>
-                <span className={css.cellValue}>{modelLabel}</span>
-                <IconChevronRightOutlineRegular className={css.cellChevron} />
-              </button>
-              {reasoning !== undefined && (
-                <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { drill('effort') }}>
-                  <span className={css.cellLabel}>{t('menu.effort')}</span>
-                  <span className={css.cellValue}>{effortLabel}</span>
-                  <IconChevronRightOutlineRegular className={css.cellChevron} />
-                </button>
-              )}
-            </>
-          )}
-
-          {pane === 'model' && (
+          {open === 'model' && (
             <>
               {state.status === 'loading' && (
                 <div className={css.status}>{t('status.loading')}</div>
@@ -412,8 +400,9 @@ export function ModelSelect(
                 {state.groups.map((group) => {
                   const headingId = `${id}-${group.id}`
                   return (
-                    <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
-                      <div className={css.groupTitle} id={headingId}>{group.name}</div>
+                    <section role="group" aria-labelledby={state.groups.length > 1 ? headingId : undefined} aria-label={state.groups.length > 1 ? undefined : group.name} className={css.group} key={group.id}>
+                      {/* One provider needs no heading: the list is just its models. */}
+                      {state.groups.length > 1 && <div className={css.groupTitle} id={headingId}>{group.name}</div>}
                       {group.models.map((model) => {
                         const selected = state.current?.provider === group.id && state.current.model === model.id
                         return (
@@ -447,7 +436,7 @@ export function ModelSelect(
             </>
           )}
 
-          {pane === 'effort' && (
+          {open === 'effort' && (
             <>
               {state.error !== null && lastActionRef.current === 'load' && (
                 <div className={css.error}>

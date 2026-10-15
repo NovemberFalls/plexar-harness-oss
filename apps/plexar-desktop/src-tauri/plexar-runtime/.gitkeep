@@ -1,0 +1,5 @@
+Placeholder so `tauri.conf.json`'s `bundle.resources` glob (`plexar-runtime/**/*`) resolves during
+`cargo build`/`tauri build` even before a release build has run
+`scripts/plexar-release/stage-windows-bundle.mjs`. That script stages the real `node/` and `harness/`
+trees here before `tauri build` packages them; a plain `cargo build` (dev/test) only needs this file
+to exist. See apps/plexar-desktop/INSTALLER.md.

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Plexar Harness</title>
+  <link rel="stylesheet" href="tokens/plexar-tokens.css">
+  <style>
+    html, body { margin: 0; height: 100%; background: var(--px-bg); color: var(--px-fg); font: 15px/1.5 var(--px-font-ui); }
+    main {
+      height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 18px; padding: 0 24px; text-align: center;
+    }
+    img { border-radius: var(--px-radius-md); }
+    .spin { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .45; transform: scale(.94); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { margin: 0; font-family: var(--px-font-display); font-size: 22px; font-weight: 500; color: var(--px-fg); }
+    p { margin: 0; color: var(--px-dim); max-width: 560px; }
+    .error { color: var(--px-error); }
+    code { background: var(--px-elev); padding: 2px 6px; border-radius: var(--px-radius-sm); color: var(--px-fg); }
+    .spinner-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--px-muted); }
+    .spinner-ring {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid var(--px-border); border-top-color: var(--px-accent);
+      animation: spin .9s linear infinite;
+    }
+
+    .card {
+      display: none;
+      width: 320px;
+      background: rgba(26, 26, 29, .7);
+      border: 1px solid var(--px-border-strong);
+      border-radius: var(--px-radius-lg);
+      padding: 28px 26px;
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    }
+    .card.visible { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+    .card.error { border-color: rgba(242, 138, 46, .45); }
+    .card h1 { font-size: 19px; }
+    .card .card-title { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 500; }
+    .card p.hint { color: var(--px-dim); font-size: 13.5px; line-height: 1.55; margin: 0; }
+    .card input {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--px-bg);
+      border: 1px solid var(--px-border);
+      border-radius: var(--px-radius-sm);
+      padding: 10px 12px;
+      color: var(--px-fg);
+      font: inherit;
+    }
+    .card input:focus { outline: 1px solid var(--px-accent); }
+    .card button {
+      width: 100%;
+      background: #c0692c;
+      border: none;
+      border-radius: 11px;
+      padding: 11px 12px;
+      color: #fff4ea;
+      font-weight: 500;
+      font: inherit;
+      cursor: pointer;
+    }
+    .card button:hover:not(:disabled) { background: var(--px-accent); }
+    .card button:disabled { opacity: .6; cursor: default; }
+    .card button.cancel-btn { background: none; color: var(--px-dim); font-weight: 400; padding: 4px; }
+    .card button.cancel-btn:hover { color: var(--px-fg); background: none; }
+    .card .signin-error { color: var(--px-error); font-size: 13px; margin: 0; min-height: 1.2em; }
+    .card .signin-status { color: var(--px-dim); font-size: 13px; margin: 0; min-height: 1.2em; }
+    .card .footer-row { width: 100%; display: flex; justify-content: space-between; font-size: 12px; color: var(--px-faint); }
+    .card .footer-row a { color: var(--px-faint); text-decoration: underline; cursor: pointer; }
+    .card .footer-row a:hover { color: var(--px-text); }
+    .card .ready-badge {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(242, 138, 46, .12); border: 1px solid rgba(242, 138, 46, .5);
+      display: flex; align-items: center; justify-content: center; color: var(--px-accent); font-size: 20px;
+    }
+    .card .exit-code {
+      font-family: var(--px-font-mono); font-size: 12px; color: var(--px-dim);
+      padding: 8px 10px; border-radius: 8px; background: rgba(8, 8, 9, .8); border: 1px solid var(--px-elev);
+      width: 100%; box-sizing: border-box; text-align: left;
+    }
+    main.hidden-spinner > img, main.hidden-spinner > h1,
+    main.hidden-spinner > p#status, main.hidden-spinner > .spinner-row { display: none; }
+  </style>
+</head>
+<body>
+  <main id="main">
+    <img class="spin" src="mark.png" width="96" height="96" alt="">
+    <h1>Starting Plexar Harness</h1>
+    <div class="spinner-row"><span class="spinner-ring"></span><span id="status">Checking Node</span></div>
+
+    <!-- "No key" state: contract §10p sign-in, plus the oob ("Use a code instead") variant. -->
+    <form class="card" id="signin-card" autocomplete="off">
+      <div class="card-title"><img src="mark.png" width="30" height="30" alt="">Connect to Plexar</div>
+      <p class="hint" id="signin-hint">
+        This computer doesn't have a key yet. Sign in on llm.plexar.tech and approve it there.
+        The key comes back here automatically.
+      </p>
+      <div class="code-field" id="code-field" style="display:none; width:100%">
+        <input id="code-input" type="text" placeholder="Paste the code" autocomplete="off" spellcheck="false">
+      </div>
+      <button id="signin-submit" type="submit">Open llm.plexar.tech</button>
+      <button id="signin-cancel" type="button" class="cancel-btn" style="display:none">Cancel</button>
+      <p class="signin-status" id="signin-status"></p>
+      <p class="signin-error" id="signin-error"></p>
+      <div class="footer-row" id="signin-footer" style="display:none">
+        <span id="signin-waiting"></span>
+        <a id="use-code-link">Use a code instead</a>
+      </div>
+    </form>
+  </main>
+  <script>
+    const mainEl = document.getElementById('main');
+    const status = document.getElementById('status');
+    const logo = document.querySelector('img.spin');
+    const card = document.getElementById('signin-card');
+    const signinHint = document.getElementById('signin-hint');
+    const submitButton = document.getElementById('signin-submit');
+    const cancelButton = document.getElementById('signin-cancel');
+    const signinError = document.getElementById('signin-error');
+    const signinStatus = document.getElementById('signin-status');
+    const signinFooter = document.getElementById('signin-footer');
+    const signinWaiting = document.getElementById('signin-waiting');
+    const useCodeLink = document.getElementById('use-code-link');
+    const codeField = document.getElementById('code-field');
+    const codeInput = document.getElementById('code-input');
+    const HINTS = {
+      key_missing: 'Close and reopen the app, then choose <code>Open llm.plexar.tech</code> to sign in. No access yet? Ask your Plexar admin.',
+      profile_install_failed: 'Run <code>packages/bundle/plexar/profiles/install.ps1</code> once, then reopen the app.',
+      node_too_old: 'Install Node 22.19 or newer, then reopen the app.',
+    };
+    const escape = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+    let signinInFlight = false;
+    // 'google' (the default button) or 'code' ("Use a code instead"); tracks which flow Cancel and
+    // the submit handler apply to.
+    let signinMode = 'google';
+
+    function setSigningIn(inFlight) {
+      signinInFlight = inFlight;
+      submitButton.disabled = inFlight;
+      cancelButton.style.display = inFlight ? 'block' : 'none';
+    }
+
+    const GOOGLE_HINT = signinHint.textContent;
+    const CODE_HINT = 'Sign in on llm.plexar.tech in the browser tab that just opened, then paste the code it shows here.';
+
+    function enterCodeMode() {
+      signinMode = 'code';
+      signinError.textContent = '';
+      signinHint.textContent = CODE_HINT;
+      // Cancel returns to the normal sign-in.
+      cancelButton.style.display = 'block';
+      submitButton.textContent = 'Sign in with the code';
+      codeField.style.display = 'block';
+      useCodeLink.style.display = 'none';
+      signinWaiting.textContent = '';
+      window.__TAURI__.core.invoke('start_code_sign_in').catch((message) => {
+        signinError.textContent = String(message);
+      });
+    }
+
+    function resetToGoogleMode() {
+      signinMode = 'google';
+      submitButton.textContent = 'Open llm.plexar.tech';
+      codeField.style.display = 'none';
+      codeInput.value = '';
+      useCodeLink.style.display = 'inline';
+      signinHint.textContent = GOOGLE_HINT;
+      cancelButton.style.display = 'none';
+    }
+
+    card.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (signinInFlight) return;
+      setSigningIn(true);
+      signinError.textContent = '';
+      try {
+        if (signinMode === 'code') {
+          const code = codeInput.value.trim();
+          if (!code) {
+            signinError.textContent = 'Paste the code first.';
+            setSigningIn(false);
+            return;
+          }
+          signinStatus.textContent = 'Signing in…';
+          await window.__TAURI__.core.invoke('sign_in_code', { code });
+        } else {
+          signinStatus.textContent = 'Waiting for you to finish signing in with Google…';
+          await window.__TAURI__.core.invoke('sign_in_google');
+        }
+        // Success: the status poll below takes over once the Host reports its URL.
+        signinStatus.textContent = '';
+        card.classList.remove('visible');
+        mainEl.classList.remove('hidden-spinner');
+      } catch (message) {
+        signinStatus.textContent = '';
+        signinError.textContent = String(message);
+      } finally {
+        setSigningIn(false);
+      }
+    });
+
+    cancelButton.addEventListener('click', () => {
+      window.__TAURI__.core.invoke('cancel_sign_in');
+      resetToGoogleMode();
+    });
+
+    useCodeLink.addEventListener('click', enterCodeMode);
+
+    function showCard(message) {
+      // Polling calls this repeatedly; only the first call (or a new startup message) may set the
+      // text, so an error from the Sign in button is not wiped by the next poll.
+      if (card.classList.contains('visible') && !message) return;
+      logo.classList.remove('spin');
+      mainEl.classList.add('hidden-spinner');
+      card.classList.add('visible');
+      signinFooter.style.display = 'flex';
+      if (message) signinError.textContent = message;
+    }
+
+    async function poll() {
+      const { error, needsSignin, signinMessage, signinEmail, signinPort } = await window.__TAURI__.core.invoke('host_status');
+      if (needsSignin) {
+        showCard(signinMessage);
+        signinWaiting.textContent = signinPort ? `Waiting on port ${signinPort}…` : '';
+        setTimeout(poll, 300);
+        return;
+      }
+      if (signinEmail && !error) {
+        status.textContent = `Signed in as ${signinEmail}. Starting…`;
+      }
+      if (error) {
+        logo.classList.remove('spin');
+        document.querySelector('.spinner-row').style.display = 'none';
+        const code = (error.match(/^error (\w+):/) || [])[1];
+        const text = error.replace(/^error \w+: /, '');
+        status.innerHTML = `<span class="error">${escape(text)}</span>${HINTS[code] ? `<br><br>${HINTS[code]}` : ''}`;
+        status.style.display = 'block';
+        return;
+      }
+      setTimeout(poll, 300);
+    }
+    poll();
+  </script>
+</body>
+</html>

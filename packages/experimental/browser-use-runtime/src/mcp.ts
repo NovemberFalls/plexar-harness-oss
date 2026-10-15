@@ -83,6 +83,21 @@ export interface SessionMcpOptions {
   env?: Record<string, string>
   /** Per-call timeout override; omission retains the MCP client default. */
   toolCallTimeoutMs?: number
+  /**
+   * Choose one Session's server arguments before it starts; omission always uses `args`.
+   * The returned `close` runs when that Session's server is released or its start fails.
+   */
+  prepare?: (agent: Agent, signal: AbortSignal) => Promise<SessionMcpLaunch>
+}
+
+/** One Session's server arguments chosen by `SessionMcpOptions.prepare`. */
+export interface SessionMcpLaunch {
+  /** Arguments passed directly without a shell, replacing `SessionMcpOptions.args`. */
+  args: string[]
+  /** Overrides merged over `SessionMcpOptions.env` for this Session's server only. */
+  env?: Record<string, string>
+  /** Release resources the choice holds, after the Session's server closed. */
+  close?: () => void
 }
 
 interface ClientState {
@@ -133,6 +148,9 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
         signal.addEventListener('abort', cancel, { once: true })
         try {
           signal.throwIfAborted()
+          const launch = options.prepare === undefined ? undefined : await options.prepare(agent, signal)
+          const release = launch?.close
+          if (release !== undefined) scope.ctx.effect(() => release, `${options.name}.launch`)
           scope.ctx.on('tools/execute', async (exec, next) => {
             if (!exec.name.startsWith(toolPrefix)) return next()
             if (exec.agent !== agent) {
@@ -145,8 +163,8 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
             transport: 'stdio',
             serverName: options.name,
             command: options.command,
-            args: options.args,
-            ...options.env === undefined ? {} : { env: options.env },
+            args: launch?.args ?? options.args,
+            ...options.env === undefined && launch?.env === undefined ? {} : { env: { ...options.env, ...launch?.env } },
             ...agent.session.header.cwd === undefined ? {} : { cwd: agent.session.header.cwd },
             ...options.toolCallTimeoutMs === undefined ? {} : { toolCallTimeoutMs: options.toolCallTimeoutMs },
             failOnStartupError: true,

@@ -1,0 +1,25 @@
+[package]
+name = "plexar-desktop"
+version = "0.1.0"
+description = "Plexar Harness desktop app: a Tauri window around the Plexar Web UI"
+edition = "2021"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+keyring = "4"
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip", "json"] }
+sha2 = "0.10"
+base64 = "0.22"
+ring = "0.17"
+tauri-plugin-updater = "2"
+tauri-plugin-dialog = "2"
+
+[profile.release]
+strip = true
+lto = true

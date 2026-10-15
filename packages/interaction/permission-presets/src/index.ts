@@ -165,12 +165,19 @@ export interface Config {
    * sandbox and approval defaults is used.
    */
   defaultPreset: Volatile<string | undefined>
+  /**
+   * Whether the mounted `ctx.shell` must confine commands. `required` (default) rejects an executor
+   * without a `sandboxMode` at load. `none` declares a composition whose shell runs unconfined and
+   * gates commands through approval instead; the presets' `sandbox` value then governs only the
+   * in-process file tools that read `ctx.sandboxPolicy`.
+   */
+  shellConfinement: 'required' | 'none'
 }
 
 /**
  * Owns the deployment's configured permission presets, the fixed Auto
- * integration hook, and their write path. Requires a confining `ctx.shell` executor and
- * `ctx.approval`; unmatched knob values are reported as
+ * integration hook, and their write path. Requires `ctx.approval` and, unless
+ * `shellConfinement` is `none`, a confining `ctx.shell` executor; unmatched knob values are reported as
  * {@link CUSTOM_PRESET}, not an error.
  */
 export class PermissionPresetService extends TypertRemoteService {
@@ -192,6 +199,7 @@ export class PermissionPresetService extends TypertRemoteService {
       },
     }),
     defaultPreset: z.string().volatile(),
+    shellConfinement: z.union(['required', 'none'] as const).default('required'),
   })
 
   static inject = ['shell', 'approval', 'sessions', 'sessionProjections']
@@ -212,7 +220,7 @@ export class PermissionPresetService extends TypertRemoteService {
     if (AUTO_PRESET in this.presets) {
       throw new Error(`permission: "${AUTO_PRESET}" is reserved and cannot name a configured preset`)
     }
-    if (ctx.shell.sandboxMode === undefined) {
+    if (config.shellConfinement === 'required' && ctx.shell.sandboxMode === undefined) {
       throw new Error('permission: the mounted bash executor does not confine (no sandboxMode) — presets bundle a sandbox mode, so composing this plugin over an unconfined executor is a misconfiguration')
     }
     const inferredDefault = this.derive(EMPTY_KNOBS)

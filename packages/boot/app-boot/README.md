@@ -177,7 +177,7 @@ Read these pages when the package-level contract is not enough. They move from t
 <a id="model-experience"></a>
 ## Model Experience
 
-Indirectly, through the loaded plugin tree, which alone contributes model context; the one export that adds model-visible text, `addHarnessSourceSection`, does so only when a consumer calls it after boot.
+Indirectly, through the loaded plugin tree, which alone contributes model context; the one export that adds model-visible text, `addHarnessSourceSection`, does so only when a consumer calls it after boot. Its text names the product by the caller's `productName` argument, defaulting to `'DeepSeek Harness'` so an omitted argument reproduces upstream's byte-identical text; the caller supplies this value from its own validated `Config` field rather than a hidden default inside this package.
 
 #### KV Cache effect
 

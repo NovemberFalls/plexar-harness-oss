@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<!--
+  **LEN'S DOCUMENT, IN THE SHAPE THE MODEL ACTUALLY WROTE IT (T32).**
+
+  `qwen3-30b-instruct` produced exactly this after T30 put the shelf in the
+  preamble — the exact path, and "never a CDN URL for it", on the wire at all
+  five `assemble()` sites. It wrote the CDN anyway and the user got a blank box
+  with a legend floating in it.
+
+  So the reference is verbatim from his session and must stay verbatim: the
+  moment this fixture is "tidied" to the local path it stops being the case
+  under test and starts being `short-chart.html`.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quarterly Revenue Forecast (2024)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 18px 20px; }
+  h1 { font-size: 22px; margin: 4px 0 14px; }
+  .wrap { max-width: 720px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Quarterly Revenue Forecast (2024)</h1>
+  <canvas id="c" height="220"></canvas>
+</div>
+<script>
+  // **Left to throw on purpose.** Without the redirect `Chart` is undefined
+  // here, which is what puts a report on T31's error channel — and that report
+  // is what the watch-to-fail arm reads. A fixture that guarded this call would
+  // fail silently and prove nothing.
+  new Chart(document.getElementById('c'), {
+    type: 'bar',
+    data: {
+      labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+      datasets: [
+        { label: 'Actual Revenue ($K)', data: [420, 468, 501, 0],
+          backgroundColor: '#8b5cf6' },
+        { label: 'Forecast Revenue ($K)', data: [0, 0, 0, 545],
+          backgroundColor: '#f59e0b' },
+      ],
+    },
+    options: { animation: false, responsive: true },
+  });
+</script>
+</body>
+</html>

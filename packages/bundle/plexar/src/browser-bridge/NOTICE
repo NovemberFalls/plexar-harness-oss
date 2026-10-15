@@ -1,0 +1,13 @@
+Plexar Browser Bridge relay (packages/bundle/plexar/src/browser-bridge)
+
+This directory contains code derived from Playwright
+(https://github.com/microsoft/playwright), commit b9a34ac7783a1b6c2e1dfff0c08ac744c048fa59:
+
+  relay.ts          from packages/playwright-core/src/tools/mcp/cdpRelay.ts (modified)
+  relay-v2.ts       from packages/playwright-core/src/tools/mcp/cdpRelayV2.ts (modified)
+  browser-model.ts  from packages/playwright-core/src/tools/mcp/browserModel.ts (import paths only)
+  protocol.ts       from packages/playwright-core/src/tools/mcp/protocol.ts (unchanged)
+
+Copyright (c) Microsoft Corporation.
+Licensed under the Apache License, Version 2.0; see http://www.apache.org/licenses/LICENSE-2.0.
+Each derived file keeps its original license header and states its changes.

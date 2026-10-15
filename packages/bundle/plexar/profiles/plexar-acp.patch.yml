@@ -1,0 +1,8 @@
+# Profile layer for plexar-acp (base + acp-app + @plexar/dsh-plexar).
+# The acp row exists only in the acp-app bundle, so its route lives here,
+# not in the shared bundle. Installed by profiles/install.ps1.
+- id: acp
+  config:
+    provider: plexar
+    agentName: plexar-harness-acp
+    model: !!js process.env.PLEXAR_MODEL ?? 'Qwen/Qwen3.6-35B-A3B'

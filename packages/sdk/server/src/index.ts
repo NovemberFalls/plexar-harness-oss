@@ -25,6 +25,16 @@ export const inject = ['agents']
 export interface JsonRpcConfig {
   /** Report max-token turn/subagent termination as a successful SDK result. */
   maxTokensAsSuccess?: boolean
+  /**
+   * Deployment name rendered in the "unknown method" JSON-RPC error (default `'DeepSeek Harness'`);
+   * unset reproduces upstream's error text byte-for-byte.
+   */
+  productName?: string
+  /**
+   * `initialize` response `serverInfo.name` (default `'deepseek-harness-sdk-runtime'`);
+   * unset reproduces upstream's wire identity byte-for-byte.
+   */
+  serverName?: string
   /** Transport input override; production uses `process.stdin`. */
   input?: Readable
   /** Transport output override; production uses `process.stdout`. */
@@ -35,6 +45,8 @@ export interface JsonRpcConfig {
 
 export const Config: Schema<JsonRpcConfig> = Schema.object({
   maxTokensAsSuccess: Schema.boolean().default(false),
+  productName: Schema.string().default('DeepSeek Harness'),
+  serverName: Schema.string().default('deepseek-harness-sdk-runtime'),
 })
 
 /**
@@ -45,7 +57,7 @@ export const Config: Schema<JsonRpcConfig> = Schema.object({
  */
 export function apply(ctx: Context, config: JsonRpcConfig): void {
   // Cordis applies the schema default before invoking the plugin.
-  const resolvedConfig = config as JsonRpcConfig & { maxTokensAsSuccess: boolean }
+  const resolvedConfig = config as JsonRpcConfig & { maxTokensAsSuccess: boolean; productName: string; serverName: string }
   // Protocol shutdown owns the complete runtime process, so it must await the
   // root lifecycle (including persistence) before exiting.
   const rootFiber = ctx.root.fiber
@@ -59,6 +71,8 @@ export function apply(ctx: Context, config: JsonRpcConfig): void {
   const transport = new JsonRpcLineTransport(input, output)
   const server = new HarnessSdkJsonRpcServer(ctx, transport, {
     maxTokensAsSuccess: resolvedConfig.maxTokensAsSuccess,
+    productName: resolvedConfig.productName,
+    serverName: resolvedConfig.serverName,
   })
 
   // Share one exit task so racing shutdown requests cannot dispose the root or

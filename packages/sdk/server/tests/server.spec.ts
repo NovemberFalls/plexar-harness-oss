@@ -1090,6 +1090,46 @@ describe('HarnessSdkJsonRpcServer', () => {
     }
   })
 
+  it('reports a configured server name in the initialize response', async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), 'dsh-jsonrpc-server-name-'))
+    const llmServer = await mockCompletionServer()
+    vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
+    vi.stubEnv('DEEPSEEK_BASE_URL', llmServer.url)
+    const ctx = await makeHarness(storageDir)
+    try {
+      const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport(), { serverName: 'plexar-harness-sdk-runtime' })
+
+      const init = await server.handleRequest('initialize', {
+        cwd: storageDir,
+        provider: 'deepseek-official',
+        model: 'dsagent-model',
+      }) as { serverInfo: { name: string } }
+      expect(init.serverInfo.name).toBe('plexar-harness-sdk-runtime')
+
+      await server.handleRequest('shutdown', undefined)
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(storageDir, { recursive: true, force: true })
+    }
+  })
+
+  it('renders a configured product name in the unknown-method error', async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), 'dsh-jsonrpc-unknown-product-'))
+    const ctx = await makeHarness(storageDir)
+    try {
+      const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport(), { productName: 'Plexar Harness' })
+
+      await expect(server.handleRequest('does/not/exist', {}))
+        .rejects
+        .toThrow('unknown Plexar Harness SDK runtime method: does/not/exist')
+
+      await server.shutdown()
+    } finally {
+      await ctx.fiber.dispose()
+      await rm(storageDir, { recursive: true, force: true })
+    }
+  })
+
   it('coalesces concurrent session creation and retries a failed creation', async () => {
     let resolveShared: ((handle: AgentHandle) => void) | undefined
     const sharedCreation = new Promise<AgentHandle>((resolve) => { resolveShared = resolve })

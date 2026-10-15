@@ -1,0 +1,30 @@
+# Profile layer for plexar-web (base + web-app + @plexar/dsh-plexar + brand).
+# The Plexar bundle assumes no DeepSeek account service; two Web rows hard-inject it.
+- id: account-controller
+  disabled: true
+- id: ui-settings-account
+  disabled: true
+# Plexar brand in the sidebar slots (the official occupant is build-gated off).
+- id: ui-brand-official
+  disabled: true
+- insert:
+    - id: ui-brand-plexar
+      name: '@plexar/dsh-client-ui-brand'
+    # Settings > Features (on/off toggles) and Settings > Credits.
+    - id: ui-settings-plexar
+      name: '@plexar/dsh-client-ui-settings-plexar'
+# Chat-first: the harness chooses the agent preset (Standard by default); users
+# never pick toolsets. Hides the hero preset menu and the General-settings row.
+- id: ui-agent-preset
+  disabled: true
+# The Plugins page needs the plugin-manager Host service (the shared bundle turns it
+# off); voice input's one-time model download is started from that page. The model's
+# plugin tool (tool-plugin-manager) stays off.
+- id: plugin-manager
+  disabled: false
+# No Plugins sidebar page. Settings > Built-in plugins stays until Features carries a
+# toggle for every tool it lists.
+- id: ui-plugin-manager
+  disabled: true
+- id: ui-settings-plugins
+  disabled: true

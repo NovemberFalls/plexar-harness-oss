@@ -1,0 +1,44 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 4px;
+}
+
+.mark {
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.heading {
+  margin: 0 0 4px;
+}
+
+.thanks {
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.link {
+  color: rgba(90, 170, 255, 0.9);
+}
+
+.partsHeading {
+  margin: 0 0 6px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.parts {
+  margin: 0;
+  padding: 10px 14px;
+  list-style: disc;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.parts li {
+  padding: 2px 0;
+  font-size: 13px;
+}

@@ -524,6 +524,26 @@ describe('provider profile lifecycle', () => {
     expect((await ctx.llm.resolveModelInfo('openai', 'gpt-4.1')).reasoning).toBeUndefined()
   })
 
+  it('does not send the provider reasoning default to a model with no reasoning levels', async () => {
+    const server = await mockServer([{ events: textEvents }])
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LlmPiAi, {
+      providers: {
+        'acme-gateway': {
+          apiKeyEnv: 'PI_TEST_KEY',
+          api: 'openai-completions',
+          baseURL: `${server.url}/v1`,
+          reasoning: 'high',
+          models: [{ id: 'acme-plain', contextWindow: 65_536, maxTokens: 4096 }],
+        },
+      },
+    })
+    const result = await assemble(ctx, { provider: 'acme-gateway', model: 'acme-plain', messages: [] })
+    expect(result.finish.kind).not.toBe('error')
+    expect(server.requests[0]).not.toHaveProperty('reasoning_effort')
+  })
+
   it('uses a supported profile reasoning value as the model default and rejects an unsupported one', async () => {
     const supported = new Context()
     await supported.plugin(LlmRuntime)

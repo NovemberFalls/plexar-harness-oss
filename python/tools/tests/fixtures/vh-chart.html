@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<!--
+  **A CHART SIZED IN VIEWPORT UNITS (T33).**
+
+  This is the shape C56.2's own finding told the model to write: *"in full
+  screen the artifact is handed the whole viewport and `height: 100%` / `vh` is
+  what uses it."* That advice is right for full screen and it is a FEEDBACK LOOP
+  inline, because `vh` inside the frame resolves against the frame's height —
+  which C54 sets from the document's height, which the chart just grew.
+
+  Chart.js is loaded from the shelf, so nothing here is refused: this fixture is
+  about geometry only, and if it ever starts reporting a blocked resource the
+  arm is measuring the wrong thing.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quarterly Revenue Forecast (2024)</title>
+<script src="/lib/chart.umd.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 18px 20px; }
+  h1 { font-size: 22px; margin: 4px 0 14px; }
+  /* The container that does it. A definite-looking height that is not
+     definite at all, because its basis moves every time we resize the frame. */
+  .chart-box { height: 70vh; min-height: 320px; }
+</style>
+</head>
+<body>
+<h1>Quarterly Revenue Forecast (2024)</h1>
+<div class="chart-box"><canvas id="c"></canvas></div>
+<script>
+  new Chart(document.getElementById('c'), {
+    type: 'bar',
+    data: {
+      labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+      datasets: [
+        { label: 'Actual Revenue ($K)', data: [420, 468, 501, 0],
+          backgroundColor: '#8b5cf6' },
+        { label: 'Forecast Revenue ($K)', data: [0, 0, 0, 545],
+          backgroundColor: '#f59e0b' },
+      ],
+    },
+    // `responsive` with `maintainAspectRatio: false` is what makes the canvas
+    // take its container's HEIGHT rather than deriving it from the width — the
+    // combination a model writes when it wants a chart to fill a box.
+    options: { animation: false, responsive: true, maintainAspectRatio: false },
+  });
+</script>
+</body>
+</html>

@@ -341,10 +341,12 @@ export class PiAiAdapter extends LlmAdapter {
     // the one it started with and the next call picks up the new one.
     const profile = this.profileOf(snapshot, options.provider)
     const model = this.modelOf(snapshot, options.provider, options.model)
-    const reasoning = resolveReasoningLevel(
-      model,
-      options.reasoningEffort ?? profile.reasoning,
-    )
+    // The provider-wide default does not apply to a model with no reasoning levels at all (a
+    // non-reasoning model on a reasoning provider). An explicit effort, and a default a reasoning
+    // model cannot take, are still refused: the latter is a misconfiguration.
+    const reasoning = options.reasoningEffort === undefined && !model.reasoning
+      ? undefined
+      : resolveReasoningLevel(model, options.reasoningEffort ?? profile.reasoning)
     const apiKey = await this.config.resolveApiKey(options.provider, profile)
 
     const consumer = new AbortController()

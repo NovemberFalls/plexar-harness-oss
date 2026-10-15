@@ -36,6 +36,8 @@ The plugin creates one agent per `sessionId` on first use. A registered model ad
 | Field | Default | Meaning |
 |---|---|---|
 | `maxTokensAsSuccess` | `false` | Report max-token turn/subagent termination as a successful SDK result |
+| `productName` | `'DeepSeek Harness'` | Deployment name rendered in the "unknown method" JSON-RPC error |
+| `serverName` | `'deepseek-harness-sdk-runtime'` | `initialize` response `serverInfo.name` |
 
 The profile composition owns each root agent's tools. `input`, `output`, and `exit` are runtime-only transport hooks for tests; production uses process stdio and `process.exit`. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-sdk-jsonrpc-server) is the exhaustive source for every accepted field.
 

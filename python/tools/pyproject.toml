@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling==1.30.1"]
+build-backend = "hatchling.build"
+
+[project]
+name = "plexar-tools"
+version = "0.0.0.dev0"
+description = "Host-free document and file tools shared between DeepSeek Harness and Chat"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Plexar" }]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+# Tests import the package from src/ directly, so they run from a clean checkout without installing it.
+pythonpath = ["src"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/plexar_tools"]

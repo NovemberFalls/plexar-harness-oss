@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<!--
+  AN ARTIFACT THE SANDBOX ACTUALLY REFUSES (C57).
+
+  Every other fixture in this directory is a WELL-BEHAVED artifact: both
+  `len-carriers.html` and `short-chart.html` load Chart.js from the local shelf
+  at `/lib/chart.umd.js`, so nothing they ask for is ever denied and the report
+  band must stay silent for them. **They are the zero.**
+
+  This one is the loud case, and it is not invented: `<script src>` pointing at
+  `cdn.jsdelivr.net` is EXACTLY what Len's first artifact carried before C50
+  vendored the shelf, and it is what the model still writes whenever it forgets
+  the shelf exists. Under the artifact origin's policy —
+
+      script-src 'unsafe-inline' 'self'      the CDN script is refused
+      img-src data: 'self'                   every external image is refused
+
+  — this document produces five violations from four distinct addresses. The
+  fifth is a deliberate EXACT DUPLICATE of the first image, because "the same
+  refusal twice" is how a page with a broken image loop would look and the band
+  must count it once.
+
+  The chart never draws, on purpose. That is the whole point: without the band
+  this is a blank box with no explanation, which is the defect C50 was paid for.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quarterly Revenue</title>
+<!-- **NOT Chart.js, and not on a shelf host — DELIBERATELY (T32).**
+     This fixture exists to prove a refused script is REPORTED. Since T32 a
+     Chart.js reference on a known CDN is redirected onto the local shelf
+     rather than refused, so leaving this pointed at jsdelivr would quietly
+     turn the loud fixture into the silent one and this file would gate
+     nothing at all. `test_shelf_redirect.py` owns the redirect; this owns
+     the refusal, and the two must not be able to swap places. -->
+<script src="https://cdn.example.com/npm/sparkline.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 18px 20px; }
+  h1 { font-size: 26px; margin: 4px 0 12px; }
+  p { color: #444; line-height: 1.5; }
+  .wrap { height: 300px; }
+  img { width: 40px; height: 40px; }
+</style>
+</head>
+<body>
+<h1>Quarterly Revenue</h1>
+<p>
+  Revenue by quarter for the last financial year, drawn with Chart.js. The
+  figures below are mock data and exist only to give the chart a shape to take.
+</p>
+<img src="https://a.example.com/logo.png" alt="">
+<img src="https://b.example.com/badge.png" alt="">
+<!-- **A SOURCEMAP, WHICH MUST NOT BE REPORTED (T33).** DevTools asks for
+     these; the document did not. Len saw "This preview blocked
+     plexar-artifacts.boord-its.com" because Chart.js on our own shelf
+     references its .map and connect-src refused it — our origin named as
+     the culprit for a request the artifact never made. `d.example.com` is
+     absent from this file's expected host set, so if the filter breaks it
+     appears there and the arm reddens. -->
+<img src="https://d.example.com/tile.map" alt="">
+<img src="https://c.example.com/spark.png" alt="">
+<img src="https://a.example.com/logo.png" alt="">
+<div class="wrap"><canvas id="revenue"></canvas></div>
+<script>
+  const ctx = document.getElementById('revenue');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+      datasets: [{ label: 'Revenue', data: [42, 51, 47, 63] }],
+    },
+    options: { responsive: true, maintainAspectRatio: false },
+  });
+</script>
+</body>
+</html>

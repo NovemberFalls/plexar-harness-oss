@@ -13,6 +13,8 @@
     "**/.node-next-types-*/**",
     "website/.generated/**",
     "vendor/**",
+    "apps/plexar-browser-extension/src/**",
+    "packages/bundle/plexar/src/browser-bridge/{relay,relay-v2,browser-model,protocol}.ts",
     "native/**",
     "**/*.js",
     "**/*.mjs",

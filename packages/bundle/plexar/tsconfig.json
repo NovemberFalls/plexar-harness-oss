@@ -1,0 +1,60 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../interaction/commands"
+    },
+    {
+      "path": "../../session/session-title"
+    },
+    {
+      "path": "../../shell/shell"
+    },
+    {
+      "path": "../../shell/pwsh-local"
+    },
+    {
+      "path": "../../shell/bash-local"
+    },
+    {
+      "path": "../../core/tools"
+    },
+    {
+      "path": "../../core/session"
+    },
+    {
+      "path": "../../sandbox/sandbox-policy"
+    },
+    {
+      "path": "../../core/scope"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../experimental/browser-use-runtime"
+    },
+    {
+      "path": "../../experimental/browser-use-playwright-mcp"
+    },
+    {
+      "path": "../../typert/protocol"
+    }
+  ]
+}

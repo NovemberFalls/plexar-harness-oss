@@ -37,3 +37,10 @@ it('rejects malformed endpoints before mounting any browser resources', () => {
   expect(() => { Provider.apply(new Context(), Provider.Config({ mode: 'attach', endpoint: 'http://localhost:bad/path' })) }).toThrow('browser endpoint')
   expect(mountSessionMcp).not.toHaveBeenCalled()
 })
+
+it('passes an attach endpoint through the environment on request, replacing an inherited value', () => {
+  vi.stubEnv('PLAYWRIGHT_MCP_CDP_ENDPOINT', 'http://invalid.example:1')
+  const launch = Provider.playwrightMcpLaunch({ mode: 'attach', endpoint: 'ws://127.0.0.1:9222/cdp/t' }, { endpointInEnv: true })
+  expect(launch.args.slice(1)).toEqual(['--browser', 'chromium'])
+  expect(launch.env[Provider.CDP_ENDPOINT_ENV]).toBe('ws://127.0.0.1:9222/cdp/t')
+})

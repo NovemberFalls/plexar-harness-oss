@@ -1,3 +1,7 @@
+# Plexar Harness
+
+This repository is **Plexar Harness**, a fork of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). The agent harness, its plugin architecture and most of this code are the work of the DeepSeek team, released under the MIT license; thank you to them. Plexar adds the `plexar-harness` terminal client, the Plexar desktop app, the Browser Bridge extension and the Plexar model profiles. Plexar documentation starts at [docs/plexar/00-README.md](docs/plexar/00-README.md); the upstream README follows unchanged.
+
 # DeepSeek Harness
 
 English | [中文](README.zh.md)

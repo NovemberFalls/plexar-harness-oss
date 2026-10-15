@@ -58,6 +58,15 @@ describe('automation-only ACP bridge', () => {
     })
   })
 
+  it('reports a configured agent name in the wire identity', async () => {
+    harness = await makeBridgeHarness({ config: { agentName: 'plexar-harness-acp' } })
+    const response = await harness.client.initialize({
+      protocolVersion: PROTOCOL_VERSION,
+      clientCapabilities: { _meta: { terminal_output: true } },
+    })
+    expect(response.agentInfo).toEqual({ name: 'plexar-harness-acp', version: '0.0.1' })
+  })
+
   it('advertises image prompts only with an exact capable route and attachment store', async () => {
     harness = await makeBridgeHarness({ imageCapable: true })
     const capable = await harness.client.initialize({ protocolVersion: PROTOCOL_VERSION, clientCapabilities: {} })

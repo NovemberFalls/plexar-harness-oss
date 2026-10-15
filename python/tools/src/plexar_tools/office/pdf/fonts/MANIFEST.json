@@ -1,0 +1,38 @@
+{
+  "figtree-bold.ttf": {
+    "bytes": 24296,
+    "licence": "SIL Open Font License 1.1",
+    "postscript_name": "FigtreeLight-Bold",
+    "sha256": "00967f779a1e394340304139efdad9211a1738ce61dd1c2124d14f599e2fa1df",
+    "source": "figtree-latin.woff2",
+    "units_per_em": 1000,
+    "weight": 700
+  },
+  "figtree-regular.ttf": {
+    "bytes": 24300,
+    "licence": "SIL Open Font License 1.1",
+    "postscript_name": "FigtreeLight-Regular",
+    "sha256": "98241485ee665cc44210c2947cadcdf2dd30b4c2a62f80b6dfb50849e5f49e4c",
+    "source": "figtree-latin.woff2",
+    "units_per_em": 1000,
+    "weight": 400
+  },
+  "jetbrains-bold.ttf": {
+    "bytes": 57320,
+    "licence": "SIL Open Font License 1.1",
+    "postscript_name": "JetBrainsMono-Bold",
+    "sha256": "b50531ff5dc85b0a75d1d793f479d724f7fe3e09422790cf7bd39938192af843",
+    "source": "jetbrains-mono-latin.woff2",
+    "units_per_em": 1000,
+    "weight": 700
+  },
+  "jetbrains-regular.ttf": {
+    "bytes": 57404,
+    "licence": "SIL Open Font License 1.1",
+    "postscript_name": "JetBrainsMono-Regular",
+    "sha256": "e4ac7ed62bd05d804a07727e8d6b017d857fbce849716187834606230f1193a5",
+    "source": "jetbrains-mono-latin.woff2",
+    "units_per_em": 1000,
+    "weight": 400
+  }
+}

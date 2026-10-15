@@ -53,6 +53,20 @@ export interface Config {
    * orientation text would be false.
    */
   surfaceContext: boolean
+  /**
+   * Product name the harness-source and Web-surface prompt sections use to name this
+   * installation. A deployment presenting under another product name sets this so the
+   * model-visible text matches; the default reproduces upstream's DeepSeek Harness text
+   * byte-for-byte.
+   */
+  productName: string
+  /**
+   * Include developer-workflow prompt text: the harness-source checkout section entirely,
+   * and the HMR / `pnpm run dev:web` / apps/web Vite sentences of the Web-surface section.
+   * A deployment whose users are not harness developers turns this off so the prompt carries
+   * no development-checkout guidance; the default reproduces upstream's text byte-for-byte.
+   */
+  developerContext: boolean
   /** Explicit `--trusted-host` authorities from this invocation. */
   trustedHosts: string[]
 }
@@ -61,6 +75,8 @@ export const Config: z<Config> = z.object({
   openBrowser: z.boolean().default(true),
   printUrl: z.boolean().default(true),
   surfaceContext: z.boolean().default(true),
+  productName: z.string().default('DeepSeek Harness'),
+  developerContext: z.boolean().default(true),
   trustedHosts: z.array(String).default([]),
 })
 
@@ -131,17 +147,23 @@ export function resolveLanTrust(bindHost: string, extra: readonly string[]): Web
   return { lanAddresses, trustedHosts: [...lanAddresses, ...extra] }
 }
 
-/** Model-visible orientation and acceptance boundary for sessions created through `dsh web`. */
-function webSurfacePrompt(webUrl: string): string {
+/**
+ * Model-visible orientation and acceptance boundary for sessions created through `dsh web`.
+ * @param webUrl - the canonical local URL of this Web GUI.
+ * @param productName - the product name the opening sentence names.
+ * @param developerContext - include the HMR / `pnpm run dev:web` / apps/web Vite developer-workflow
+ * sentences; a deployment whose users are not harness developers turns this off.
+ */
+function webSurfacePrompt(webUrl: string, productName: string, developerContext: boolean): string {
   const updateContract = 'The client-plugin HMR receiver is active, but client-plugin changes reload without a refresh only while '
     + '`pnpm run dev:web` is also running from this same checkout to rebuild their bundles; verify that watcher before promising automatic updates. '
     + 'Every other change — the apps/web shell and plain packages — requires rebuilding the affected Web artifacts and verifying this existing URL after a page refresh. '
-  return `You are interacting with the user through the DeepSeek Harness Web GUI at ${webUrl}. `
+  return `You are interacting with the user through the ${productName} Web GUI at ${webUrl}. `
     + 'When the user refers to "this page", "this GUI", or "this app" without naming another target, they mean this GUI. '
     + 'The browser provides no implicit DOM, route, or screenshot context. '
-    + updateContract
+    + (developerContext ? updateContract : '')
     + 'Starting another server does not update this GUI. '
-    + 'The apps/web Vite entry builds the shell but is not a standalone application because only dsh web injects window.__DSH_BOOT__. '
+    + (developerContext ? 'The apps/web Vite entry builds the shell but is not a standalone application because only dsh web injects window.__DSH_BOOT__. ' : '')
     + 'Do not start a replacement server unless the user asks; if one is needed, use a managed background job and verify its exact URL.'
 }
 
@@ -232,11 +254,11 @@ export function apply(ctx: Context, config: Config): void {
   ctx.plugin(FrontendStatic, { distIndex: internals.resolveDistIndex() })
   if (config.surfaceContext) {
     ctx.inject(['systemPrompt'], (promptCtx) => {
-      addHarnessSourceSection(promptCtx, SOURCE_ROOT)
+      if (config.developerContext) addHarnessSourceSection(promptCtx, SOURCE_ROOT, config.productName)
       promptCtx.systemPrompt.section({
         name: 'app:web-surface',
         order: promptCtx.systemPrompt.getSectionOrder('WEB_SURFACE'),
-        text: () => webSurfacePrompt(localWebUrl(promptCtx)),
+        text: () => webSurfacePrompt(localWebUrl(promptCtx), config.productName, config.developerContext),
       })
     })
     ctx.inject(['shellEnv'], (runtimeCtx) => {

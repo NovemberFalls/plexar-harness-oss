@@ -39,6 +39,9 @@
       "path": "../../session/session-persistence"
     },
     {
+      "path": "../../interaction/commands"
+    },
+    {
       "path": "../../interaction/user-approval"
     }
   ]

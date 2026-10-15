@@ -259,6 +259,13 @@ describe('PermissionPresetService', () => {
       .rejects.toThrow(/does not confine/)
   })
 
+  it('loads over a non-confining executor when shellConfinement is none', async () => {
+    const ctx = await mounted({ bashDefault: undefined, config: { shellConfinement: 'none', defaultPreset: 'workspace-write' } })
+    const session = freshSession('sess-unconfined')
+    ctx.permissionPresets.set(session, 'danger-full-access')
+    expect(session.snapshotEvents().map(e => e.type)).toContain('sandbox/mode')
+  })
+
   it('optionOf() presents shipped labels/descriptions, falls back to the raw key, and fixes custom', async () => {
     const ctx = await mounted()
     expect(ctx.permissionPresets.optionOf('danger-full-access')).toEqual({ value: 'danger-full-access', name: 'danger-full-access', description: 'Full file access without approval prompts.' })

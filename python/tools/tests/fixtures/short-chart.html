@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!--
+  A SHORT artifact — and it exists because `len-carriers.html` cannot show the
+  defect C56.2 is about.
+
+  Len's own file for that row is a 310-line REPORT: it claims ~1977px and is
+  clamped at every viewport, so full screen looks correct with it no matter
+  what rule is in force. What he photographed on 2026-08-05 was a SINGLE CHART
+  that sizes to roughly 430px — under the ceiling at every viewport — and it is
+  only under the ceiling that "size to content" and "fill the screen" disagree.
+
+  **THIS IS A FIXTURE, NOT HIS FILE.** His `artifact.html` (166 lines) was not
+  obtainable from this lane, exactly as in C55. What is reproduced from the
+  photograph is its SHAPE — an h1, one Chart.js line chart in a fixed-height
+  wrapper, nothing else — because the shape is what makes the claim short.
+  Any finding below that depends on a number rather than on the shape is
+  labelled as depending on this fixture.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Monthly Sales Performance</title>
+<script src="/lib/chart.umd.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 18px 20px; }
+  h1 { text-align: center; font-size: 30px; margin: 6px 0 14px; }
+  .wrap { height: 330px; }
+</style>
+</head>
+<body>
+  <h1>Monthly Sales Performance</h1>
+  <div class="wrap"><canvas id="c"></canvas></div>
+<script>
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const line = (label, base, colour, fill) => ({
+    label, borderColor: colour, backgroundColor: fill, fill: true,
+    data: months.map((_, i) => i < 6 ? base + i * 2000 : null),
+  });
+  new Chart(document.getElementById('c'), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        line('Q1 Sales', 12000, '#3b6fb5', 'rgba(59,111,181,.18)'),
+        line('Q2 Sales', 24500, '#e08a1e', 'rgba(224,138,30,.18)'),
+        line('Q3 Sales', 36000, '#3aa95a', 'rgba(58,169,90,.18)'),
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { title: { display: true, text: 'Monthly Sales Performance (2023)' } },
+      scales: {
+        y: { beginAtZero: true, max: 50000, title: { display: true, text: 'Sales ($)' } },
+        x: { title: { display: true, text: 'Month' } },
+      },
+    },
+  });
+</script>
+</body>
+</html>
