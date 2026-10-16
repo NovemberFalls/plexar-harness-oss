@@ -3,6 +3,6 @@
 # not in the shared bundle. Installed by profiles/install.ps1.
 - id: acp
   config:
-    provider: !!js process.env.PLEXAR_BYO_BASE_URL ? 'byo' : 'plexar'
+    provider: !!js "process.env.PLEXAR_BYO_BASE_URL ? 'byo' : 'plexar'"
     agentName: plexar-harness-acp
-    model: !!js process.env.PLEXAR_BYO_BASE_URL ? process.env.PLEXAR_BYO_MODEL : process.env.PLEXAR_MODEL ?? 'Qwen/Qwen3.6-35B-A3B'
+    model: !!js "process.env.PLEXAR_BYO_BASE_URL ? process.env.PLEXAR_BYO_MODEL : process.env.PLEXAR_MODEL ?? 'Qwen/Qwen3.6-35B-A3B'"

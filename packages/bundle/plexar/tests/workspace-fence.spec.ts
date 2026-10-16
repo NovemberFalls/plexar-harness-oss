@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join, parse } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { Config, fenceDecision, pathArguments } from '../src/workspace-fence.ts'
+import { Config, DOCUMENT_TOOLS, fenceDecision, pathArguments } from '../src/workspace-fence.ts'
 
 const fsCalls = vi.hoisted(() => [] as string[])
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -22,7 +22,7 @@ mkdirSync(extra)
 mkdirSync(outside)
 writeFileSync(join(root, 'src', 'a.ts'), '')
 writeFileSync(join(outside, 'secret.txt'), '')
-afterAll(() => rmSync(base, { recursive: true, force: true }))
+afterAll(() => { rmSync(base, { recursive: true, force: true }) })
 
 const config = (over: Partial<Config> = {}): Config => ({
   enabled: true,
@@ -94,5 +94,18 @@ describe('workspace fence', () => {
     expect(await fenceDecision('lsp', { operation: 'hover', file_path: 'src/a.ts', line: 1, character: 1 }, root, defaults)).toBeUndefined()
     expect(await fenceDecision('present', { files: [{ path: 'src/a.ts' }, { path: '../outside/secret.txt' }] }, root, defaults)).toMatchObject({ kind: 'ask' })
     expect(await fenceDecision('present', { files: [{ path: 'src/a.ts' }] }, root, defaults)).toBeUndefined()
+  })
+
+  it('fences the plexar-doc document tools by default, including each sources value', async () => {
+    const defaults = Config({})
+    expect(defaults.tools).toEqual(expect.arrayContaining(DOCUMENT_TOOLS))
+    const read = 'mcp__plexar-doc__read_file'
+    expect(await fenceDecision(read, { path: 'src/a.ts' }, root, defaults)).toBeUndefined()
+    expect(await fenceDecision(read, { path: join(outside, 'secret.txt') }, root, defaults)).toMatchObject({ kind: 'ask' })
+    const create = 'mcp__plexar-doc__create_document'
+    expect(pathArguments(create, { sources: { logo: 'src/a.ts', chart: join(outside, 'secret.txt') } }))
+      .toEqual(['src/a.ts', join(outside, 'secret.txt')])
+    expect(await fenceDecision(create, { sources: { chart: join(outside, 'secret.txt') } }, root, defaults))
+      .toMatchObject({ kind: 'ask' })
   })
 })

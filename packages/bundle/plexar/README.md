@@ -110,8 +110,8 @@ Upstream seams: `mountSessionMcp` in `@deepseek-ai/dsh-experimental-browser-use-
 
 `cordis.patch.yml`'s `plexar-document-tools` row mounts `python/tools`' `plexar_tools` MCP server
 (`python -m plexar_tools.harness_mcp`, chat-DEC-397) over stdio, giving the model `mcp__plexar-doc__*`
-read/find/query/convert/extract/create tools that take a file `path` (resolved inside the session
-workspace; anything outside it is refused) instead of inline bytes. `PLEXAR_PYTHON` overrides the
+read/find/query/convert/extract/create tools that take a file `path` (resolved inside the folder the
+harness process started in, which refuses anything outside it; `plexar-workspace-fence` also asks before any `path` or `sources` value outside the session workspace) instead of inline bytes. `PLEXAR_PYTHON` overrides the
 interpreter; `failOnStartupError: false` means a machine without a usable Python 3.12+ still starts
 Harness, just without these six tools. See [python/tools/README.md](../../../python/tools/README.md).
 

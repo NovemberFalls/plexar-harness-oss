@@ -1,7 +1,7 @@
 {
   "name": "@plexar/dsh-plexar",
   "description": "Plexar coding profile: dsh-base + dsh-headless routed to the Plexar rig (Qwen/Qwen3.6-35B-A3B), with every DeepSeek-cloud row switched off",
-  "version": "0.4.4",
+  "version": "0.4.6",
   "private": true,
   "type": "module",
   "exports": {

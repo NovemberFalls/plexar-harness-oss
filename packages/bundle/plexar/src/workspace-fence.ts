@@ -5,7 +5,8 @@
  * mode and writes unfenced in `danger-full-access`. Before a configured file tool dispatches, this plugin
  * resolves each path argument (`file_path` for `read`, `read_image`, `write`, `edit`; `path` and an
  * absolute or `..`-leading `pattern` prefix for `glob`; `path` for `grep`; `file_path` for `lsp`; each
- * `files[].path` for `present`) against the session workspace root. A path starting with `\\` or `//`
+ * `files[].path` for `present`; `path` and each `sources` value for the `plexar-doc` document tools)
+ * against the session workspace root. A path starting with `\\` or `//`
  * (UNC, `\\?\UNC\`, device paths) is outside without any filesystem access, so no SMB connection opens.
  * Each path resolves to its real path when it exists, otherwise to the real path of its nearest
  * existing ancestor plus the remaining segments, so a symlink inside the workspace that points outside
@@ -43,9 +44,19 @@ export interface Config {
   outside: 'deny' | 'ask'
 }
 
-export const Config: z<Config> = z.object({
+/**
+ * Public names of the `plexar-doc` MCP document tools. Their server is rooted at the harness process
+ * directory, so the fence is what holds them to the session workspace.
+ */
+export const DOCUMENT_TOOLS = [
+  'read_file', 'find_in_file', 'query_sheet', 'convert_document', 'extract_document', 'create_document',
+].map(tool => `mcp__plexar-doc__${tool}`)
+
+export const Config: z<Partial<Config>, Config> = z.object({
   enabled: z.boolean().default(true),
-  tools: z.array(z.string()).default(['read', 'read_image', 'write', 'edit', 'glob', 'grep', 'lsp', 'present']),
+  tools: z.array(z.string()).default([
+    'read', 'read_image', 'write', 'edit', 'glob', 'grep', 'lsp', 'present', ...DOCUMENT_TOOLS,
+  ]),
   extraRoots: z.array(z.string()).default([]),
   outside: z.union(['deny', 'ask'] as const).default('ask'),
 })
@@ -121,10 +132,13 @@ function patternRoot(pattern: string): string | undefined {
  */
 export function pathArguments(tool: string, args: unknown): string[] {
   if (typeof args !== 'object' || args === null) return []
-  const record = args as { file_path?: unknown; path?: unknown; pattern?: unknown; files?: unknown }
+  const record = args as { file_path?: unknown; path?: unknown; pattern?: unknown; files?: unknown; sources?: unknown }
   const paths: string[] = []
   if (typeof record.file_path === 'string') paths.push(record.file_path)
   if (typeof record.path === 'string') paths.push(record.path)
+  if (typeof record.sources === 'object' && record.sources !== null && !Array.isArray(record.sources)) {
+    for (const value of Object.values(record.sources)) if (typeof value === 'string') paths.push(value)
+  }
   if (Array.isArray(record.files)) {
     for (const file of record.files) {
       const item: unknown = file
