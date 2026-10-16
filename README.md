@@ -1,81 +1,74 @@
 # Plexar Harness
 
-This repository is **Plexar Harness**, a fork of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). The agent harness, its plugin architecture and most of this code are the work of the DeepSeek team, released under the MIT license; thank you to them. Plexar adds the `plexar-harness` terminal client, the Plexar desktop app, the Browser Bridge extension and the Plexar model profiles. Plexar documentation starts at [docs/plexar/00-README.md](docs/plexar/00-README.md); the upstream README follows unchanged.
+Plexar Harness is a coding agent for your own models. It runs in a terminal, in a desktop window, or embedded in an editor over ACP, and talks to any OpenAI-compatible endpoint: the hosted Plexar models, or a server you run yourself (vLLM, llama.cpp, Ollama, LM Studio).
 
-# DeepSeek Harness
+Website: [harness.plexar.tech](https://harness.plexar.tech)
 
-English | [中文](README.zh.md)
+## Download (Windows)
 
-DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).
+**[PlexarHarness_0.4.6_x64-setup.exe](https://downloads.plexar.tech/harness/windows/PlexarHarness_0.4.6_x64-setup.exe)** — one installer, no prerequisites. It bundles Node, installs the desktop app, puts the `plexar-harness` command on your `PATH`, and updates itself when a new release is published.
 
-It is built on an **everything-is-a-plugin** architecture and powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://arxiv.org/abs/2608.25512).
+The installer is not Authenticode-signed yet, so Windows SmartScreen shows "Windows protected your PC" the first time. Choose **More info**, then **Run anyway**.
 
-Documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
+On macOS and Linux, run from source (below).
 
-## Developer preview
-
-DeepSeek Harness is in _developer preview_ and iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
-
-Review the [safety notice](SAFETY.md) before running the project.
-
-## Run
-
-### Run from `npm`
-
-Install `Node.js`, then run:
+## Use it
 
 ```sh
-npx @deepseek-ai/dsh web
+plexar-harness                # interactive session in the current folder
+plexar-harness "fix the failing test"
+plexar-harness -p "task"      # one turn, print the answer, exit
+plexar-harness -c             # resume the newest session here
+plexar-harness web            # browser UI
+plexar-harness eval           # score the model on the built-in task suite
 ```
 
-The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it in the default browser for a local launch. An SSH launch only prints the host URL because the SSH client or editor owns the local forwarded address. Pass `--no-open` to run the server without opening a browser. See [Web UI guide](docs/user/guide/index.md).
-
-### Run from source
-
-To run from a repository checkout:
+Sign in with `plexar-harness login` to use the hosted Plexar models, or skip sign-in and point it at your own server:
 
 ```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
+export PLEXAR_BYO_BASE_URL=http://localhost:8000/v1
+export PLEXAR_BYO_MODEL=Qwen/Qwen3-32B
+export PLEXAR_BYO_API_KEY=...   # only if your server needs one
+plexar-harness
+```
+
+Full command reference: [docs/plexar/08-cli.md](docs/plexar/08-cli.md).
+
+## What it does
+
+- **Small-model friendly.** A lean default tool set, and invalid tool calls get the tool's schema back so the model can correct itself. `PLEXAR_TOOL_PROFILE=full` restores every tool.
+- **Ask before it runs.** Shell commands need approval unless you choose full access, and file tools ask before touching anything outside the workspace in every mode.
+- **Measurable.** `plexar-harness eval` runs real tasks in throwaway folders and logs the score, so you can compare models and settings over time.
+- **Visible.** `--timings` shows where startup time goes; every turn reports time to first token and tokens per second.
+- **Durable sessions.** Every session is a log on disk; resume it from the terminal, the desktop app, the browser UI or Plexar Studio.
+- **Browser Bridge.** A Chrome extension that lets the agent read and drive a browser tab you choose.
+
+## Run from source
+
+Requires Node `^22.19 || >=24` and pnpm.
+
+```sh
+git clone https://github.com/NovemberFalls/plexar-harness-oss.git
+cd plexar-harness-oss
 pnpm install
 pnpm run build
-pnpm dsh web
+powershell -File packages/bundle/plexar/profiles/install.ps1   # Windows: profiles + PATH
+plexar-harness
 ```
 
-`pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
+On macOS and Linux, run the launcher directly: `packages/bundle/plexar/cli/plexar-harness`.
 
-## Community and support
+## Documentation
 
-- Submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
-- Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/Ycq5dCaS4">DeepSeek Harness Discord community</a>.
+- [docs/plexar/](docs/plexar/00-README.md): how Plexar Harness is put together, its configuration and plugins, the Studio API.
+- [packages/bundle/plexar/README.md](packages/bundle/plexar/README.md): the Plexar bundle, its plugins and settings.
 
-## Contributing
+## Built on DeepSeek Harness
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Plexar Harness is a fork of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`), the open-source, everything-is-a-plugin agent harness by [DeepSeek AI](https://deepseek.com), built on [Cordis](https://github.com/cordiverse/cordis). The agent loop, plugin architecture and most of the code in this repository are their work, released under the MIT license. Thank you to the DeepSeek team.
 
-## Development
-
-Start with the [development guide](docs/development.md) and [architecture documentation](docs/architecture.md).
-
-`pnpm run dev:web` builds, serves, and rebuilds client bundles on source edits in one terminal, and `make help` lists the matching Make targets for Web and Desktop; the guide's application commands section owns the full table.
-
-For agents, follow [AGENTS.md](AGENTS.md).
-
-## Citation
-
-```bibtex
-@misc{deepseek-harness2026,
-  title={DeepSeek Harness: Everything is a Plugin},
-  author={DeepSeek-AI},
-  year={2026},
-  publisher={GitHub},
-  howpublished={\url{https://github.com/deepseek-ai/deepseek-harness}},
-}
-```
+Plexar's additions live in `packages/bundle/plexar/` (one plugin bundle composed over the upstream profiles), `apps/plexar-desktop/`, `apps/plexar-browser-extension/` and `docs/plexar/`. The rest follows upstream; see the [upstream README](https://github.com/deepseek-ai/deepseek-harness#readme) and its [documentation](https://deepseek-harness.github.io/deepseek-harness/) for the harness itself. Read the [safety notice](SAFETY.md) before running it.
 
 ## License
 
-[MIT](LICENSE)
-
-Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT. See [LICENSE](LICENSE) for DeepSeek's copyright and Plexar's.
