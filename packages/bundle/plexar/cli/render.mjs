@@ -74,8 +74,46 @@ function inline(line) {
 }
 
 function compact(n) {
-  if (n >= 100000) return `${Math.round(n / 1000)}K`;
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n);
+  if (n >= 100000) return `${Math.round(n / 1000)}k`;
+  return n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k` : String(n);
+}
+
+const seconds = (ms) => `${(ms / 1000).toFixed(1)}s`;
+
+/**
+ * The startup timing line text, e.g. `startup: sign-in 0.4s · harness 3.1s · session 0.6s`.
+ * @param {{name: string, ms: number}[]} phases measured startup phases, in order
+ * @returns {string} the plain line, or '' when no phase was measured
+ */
+export function formatStartup(phases) {
+  if (!phases.length) return '';
+  return `startup: ${phases.map((p) => `${p.name} ${seconds(p.ms)}`).join(' · ')}`;
+}
+
+/**
+ * Output rate from a context-usage delta over the generation time.
+ * @param {number|undefined} tokens `used` growth during the turn; undefined without a usage update
+ * @param {number|undefined} generationMs time from first token to turn end; undefined without a first token
+ * @returns {number|undefined} tokens per second, or undefined when it cannot be computed
+ */
+export function outputRate(tokens, generationMs) {
+  if (tokens === undefined || generationMs === undefined || tokens <= 0 || generationMs <= 0) return undefined;
+  return tokens / (generationMs / 1000);
+}
+
+/**
+ * The end-of-turn status line text, e.g. `12.3k/32k ctx (38%) · 8.2s · first token 1.4s · 41 tok/s`.
+ * @param {{used: number, size: number, elapsedMs: number, firstTokenMs?: number, rate?: number, stopReason?: string}} turn
+ * @returns {string} the plain line; context, first token and rate parts are omitted when unknown
+ */
+export function formatTurnLine({ used, size, elapsedMs, firstTokenMs, rate, stopReason }) {
+  const parts = [];
+  if (size) parts.push(`${compact(used)}/${compact(size)} ctx (${Math.round((used / size) * 100)}%)`);
+  parts.push(seconds(elapsedMs));
+  if (firstTokenMs !== undefined) parts.push(`first token ${seconds(firstTokenMs)}`);
+  if (rate !== undefined) parts.push(`${Math.round(rate)} tok/s`);
+  if (stopReason && stopReason !== 'end_turn') parts.push(stopReason);
+  return parts.join(' · ');
 }
 
 function toolArgs(rawInput) {
@@ -101,7 +139,7 @@ export class Renderer {
   /**
    * @param {{out?: NodeJS.WritableStream, showThinking?: boolean}} [options]
    */
-  constructor({ out = process.stdout, showThinking = true, columns = () => process.stdout.columns || 100, cwd = process.cwd() } = {}) {
+  constructor({ out = process.stdout, statusOut = out, showThinking = true, columns = () => process.stdout.columns || 100, cwd = process.cwd() } = {}) {
     this.cwd = cwd;
     /** Diff rows drawn per edit: `DIFF_ROWS`, or every row after `expandDiffs()`. */
     this.diffRows = DIFF_ROWS;
@@ -110,6 +148,8 @@ export class Renderer {
     /** Before-snapshots of files that edit/write calls in flight will change, by tool call id. */
     this.snapshots = new Map();
     this.out = out;
+    /** Where the end-of-turn status line goes; null drops it. */
+    this.statusOut = statusOut;
     this.columns = columns;
     this.showThinking = showThinking;
     this.used = 0;
@@ -119,6 +159,10 @@ export class Renderer {
 
   /** Clear per-turn state. */
   reset() {
+    this.promptAt = Date.now();
+    this.firstTokenAt = undefined;
+    this.usedAtStart = this.used;
+    this.usageSeen = false;
     this.block = null;
     this.pendingLine = '';
     this.inFence = false;
@@ -186,6 +230,7 @@ export class Renderer {
   update(update) {
     switch (update.sessionUpdate) {
       case 'agent_thought_chunk': {
+        this.firstTokenAt ??= Date.now();
         const text = update.content?.type === 'text' ? update.content.text : '';
         if (this.block !== 'thought') {
           this.#enter('thought');
@@ -201,6 +246,7 @@ export class Renderer {
         break;
       }
       case 'agent_message_chunk': {
+        this.firstTokenAt ??= Date.now();
         const text = update.content?.type === 'text' ? update.content.text : '';
         if (this.block !== 'answer') {
           this.#enter('answer');
@@ -242,6 +288,7 @@ export class Renderer {
         break;
       }
       case 'usage_update':
+        if (update.used !== undefined) this.usageSeen = true;
         this.used = update.used ?? this.used;
         this.size = update.size ?? this.size;
         break;
@@ -290,11 +337,12 @@ export class Renderer {
   /** Finish the turn: flush the answer and print the usage line. */
   endTurn(stopReason, elapsedMs) {
     this.#flushLine();
-    const parts = [];
-    if (this.size) parts.push(`${compact(this.used)}/${compact(this.size)} ctx (${Math.round((this.used / this.size) * 100)}%)`);
-    parts.push(`${(elapsedMs / 1000).toFixed(1)}s`);
-    if (stopReason && stopReason !== 'end_turn') parts.push(stopReason === 'cancelled' ? style.yellow('cancelled') : style.yellow(stopReason));
-    this.#write(style.dim(`  ${parts.join(' · ')}`) + '\n');
+    const firstTokenMs = this.firstTokenAt === undefined ? undefined : this.firstTokenAt - this.promptAt;
+    const rate = outputRate(this.usageSeen ? this.used - this.usedAtStart : undefined, firstTokenMs === undefined ? undefined : elapsedMs - firstTokenMs);
+    const line = formatTurnLine({ used: this.used, size: this.size, elapsedMs, firstTokenMs, rate, stopReason });
+    const text = style.dim(`  ${line}`) + '\n';
+    if (this.statusOut === this.out) this.#write(text);
+    else this.statusOut?.write(text);
     this.reset();
   }
 }

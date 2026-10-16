@@ -59,3 +59,20 @@ export function resolveKey() {
   if (key) return { key, source: 'keyring' };
   return process.env.PLEXAR_HARNESS_KEY ? { key: process.env.PLEXAR_HARNESS_KEY, source: 'env' } : undefined;
 }
+
+/** Key sent to a BYO endpoint when `PLEXAR_BYO_API_KEY` is unset (local servers usually ignore it). */
+export const BYO_PLACEHOLDER_KEY = 'plexar-byo-no-key';
+
+/**
+ * The bring-your-own OpenAI-compatible endpoint, active when `PLEXAR_BYO_BASE_URL` is set: no
+ * Plexar sign-in, keyring lookup or rig call is made. `baseURL` is the full `/v1` base, used as-is.
+ * @param {NodeJS.ProcessEnv} [env] - the environment to read.
+ * @returns {{baseURL: string, key: string, model: string} | undefined} undefined when BYO is off.
+ * @throws {Error} naming `PLEXAR_BYO_MODEL` when the base URL is set without a model.
+ */
+export function byoConfig(env = process.env) {
+  const baseURL = env.PLEXAR_BYO_BASE_URL;
+  if (!baseURL) return undefined;
+  if (!env.PLEXAR_BYO_MODEL) throw new Error('PLEXAR_BYO_MODEL is not set; it is required when PLEXAR_BYO_BASE_URL is set');
+  return { baseURL, key: env.PLEXAR_BYO_API_KEY || BYO_PLACEHOLDER_KEY, model: env.PLEXAR_BYO_MODEL };
+}

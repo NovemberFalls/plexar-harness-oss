@@ -1,0 +1,1 @@
+{"id":"create-file","prompt":"Create a file named hello.txt in the working directory whose content is exactly the single line: hello plexar (followed by one newline).","timeoutSec":180,"check":{"cmd":["node","-e","const s=require(\"fs\").readFileSync(\"hello.txt\",\"utf8\").replace(/\\r\\n/g,\"\\n\");process.exit(s===\"hello plexar\\n\"?0:1)"]}}

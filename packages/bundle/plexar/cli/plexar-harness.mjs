@@ -14,7 +14,7 @@ import { HarnessRuntime, harnessRoot } from './acp.mjs';
 import { GATE_EXEMPT_COMMANDS, checkGate, login, logout } from './auth.mjs';
 import { explain } from './errors.mjs';
 import { attention, header } from './logo.mjs';
-import { Renderer, style } from './render.mjs';
+import { Renderer, formatStartup, style } from './render.mjs';
 import { MODES, isTrusted, load, save } from './settings.mjs';
 import { runUpdate, updateNotice } from './update.mjs';
 import { Composer, diffKey } from './tui/composer.mjs';
@@ -92,6 +92,7 @@ const HELP = `Usage: plexar-harness [options] [prompt]
   plexar-harness export <id>    print a session as text
   plexar-harness acp            run the ACP profile on stdio (for Plexar Studio)
   plexar-harness update         pull the latest harness, reinstall, rebuild
+  plexar-harness eval           run the built-in task suite and score it (--list, --task, --json)
   plexar-harness web            open the browser UI (--port N, --no-open)
   plexar-harness login          sign in to Plexar (--no-browser for a pasted code)
   plexar-harness logout         sign out and remove the stored key
@@ -105,6 +106,8 @@ Options:
   -m, --mode <mode>   permissions: ask | auto-edit | full-access
       --read-only     same as --mode ask
       --no-thinking   collapse thinking to one line
+      --timings       show startup phase times and per-turn first-token time and rate
+                      (also PLEXAR_HARNESS_TIMINGS=1)
       --cwd <dir>     workspace folder (default: current folder)
   -v, --version       print the version
   -h, --help          print this help
@@ -155,6 +158,7 @@ function parseCli() {
       mode: { type: 'string', short: 'm' },
       'read-only': { type: 'boolean' },
       'no-thinking': { type: 'boolean' },
+      timings: { type: 'boolean' },
       cwd: { type: 'string' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
@@ -210,7 +214,11 @@ export class App {
     this.quiet = false;
     this.screen = new Screen();
     this.spinner = new Spinner(this.screen);
-    this.renderer = new Renderer({ out: this.tty ? this.screen : process.stdout, showThinking: this.interactive && !args['no-thinking'], cwd: this.workspace });
+    this.timings = Boolean(args.timings) || process.env.PLEXAR_HARNESS_TIMINGS === '1';
+    /** Measured startup phases, in order: `{name, ms}`. */
+    this.phases = [];
+    // `-p` keeps stdout for the answer: the status line goes to stderr, and only with --timings.
+    this.renderer = new Renderer({ out: this.tty ? this.screen : process.stdout, statusOut: this.interactive ? undefined : (this.timings ? process.stderr : null), showThinking: this.interactive && !args['no-thinking'], cwd: this.workspace });
     this.menu = [...LOCAL_COMMANDS, ...HARNESS_COMMANDS, ...skillCommands()];
     this.lastInterrupt = 0;
     this.runtime = null;
@@ -237,16 +245,16 @@ export class App {
     }
     if (this.tty) {
       process.stdout.write(CLEAR);
-      this.spinner.start('Waking the harness…');
+      this.spinner.start('Checking sign-in…');
     }
     // The access check runs before the host starts: the host reads PLEXAR_HARNESS_KEY and the model
     // lists from its env once, at spawn, so the saved sign-in must be applied first.
-    if (this.interactive) await this.ensureSignedIn();
-    await this.startRuntime();
+    if (this.interactive) await this.phase('sign-in', 'Checking sign-in…', () => this.ensureSignedIn());
+    await this.phase('harness', 'Starting harness…', () => this.startRuntime());
     if (this.interactive) {
       // Signed out or unentitled: the host has no key, so `session/new` would fail; the notice
       // below is shown instead, and `startSession()` runs again once `/login` succeeds.
-      await this.startSession();
+      await this.phase('session', 'Opening session…', () => this.startSession());
     } else {
       await this.openSession();
       await this.applyMode();
@@ -276,6 +284,22 @@ export class App {
     if (this.args.prompt) this.enqueue(this.args.prompt);
     else this.rl.prompt();
     return undefined;
+  }
+
+  /**
+   * Run one startup step under a spinner label and record its duration in `this.phases`.
+   * The harness phase is measured spawn to initialize result when the runtime reports both.
+   * @param {string} name phase name shown in the timing line
+   * @param {string} label spinner label while the step runs
+   * @param {() => Promise<unknown>} step the work
+   */
+  async phase(name, label, step) {
+    if (this.tty) this.spinner.setLabel(label);
+    const began = Date.now();
+    await step();
+    const rt = this.runtime;
+    const measured = name === 'harness' && rt?.spawnedAt != null && rt?.readyAt != null ? rt.readyAt - rt.spawnedAt : Date.now() - began;
+    this.phases.push({ name, ms: measured });
   }
 
   /** Terminal UI: framed composer, `/` menu, animated turns, arrow-key prompts. */
@@ -402,7 +426,10 @@ export class App {
     const notice = this.updateNotice ? `  ${fg(PALETTE.orange, this.updateNotice)}
 
 ` : '';
-    process.stdout.write(`${this.tty ? CLEAR : ''}${out}${notice}${hint}`);
+    const startup = this.timings && this.phases.length ? style.dim(`  ${formatStartup(this.phases)}
+
+`) : '';
+    process.stdout.write(`${this.tty ? CLEAR : ''}${out}${startup}${notice}${hint}`);
   }
 
   /** Folder-trust gate, asked once per folder (or parent) and remembered in the settings file. */
@@ -864,6 +891,7 @@ if (isMain && process.argv[2] === 'export') runExport(process.argv.slice(3));
 if (isMain && process.argv[2] === 'login') process.exit(await login({ noBrowser: process.argv.includes('--no-browser') }));
 if (isMain && process.argv[2] === 'logout') process.exit(await logout());
 if (isMain && process.argv[2] === 'update') process.exit(runUpdate());
+if (isMain && process.argv[2] === 'eval') process.exit(await (await import('./eval.mjs')).runEval(process.argv.slice(3)));
 
 /**
  * Entitlement gate run before starting any Host (`login`, `logout`, `update`, `--help`, `--version`

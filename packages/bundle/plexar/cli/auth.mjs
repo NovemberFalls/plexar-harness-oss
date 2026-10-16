@@ -7,7 +7,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createInterface } from 'node:readline';
 import { spawn } from 'node:child_process';
-import { deleteKey, resolveKey, storeKey } from './credentials.mjs';
+import { byoConfig, deleteKey, resolveKey, storeKey } from './credentials.mjs';
 
 /** Rig base URL: `PLEXAR_RIG_URL`, else the shared rig. */
 export function rigUrl() {
@@ -292,7 +292,9 @@ export async function logout() {
 }
 
 /**
- * The entitlement gate the launcher runs before starting any Host.
+ * The entitlement gate the launcher runs before starting any Host. With `PLEXAR_BYO_BASE_URL` set
+ * it passes with the BYO key and makes no keyring lookup or `/me` call; it also sets
+ * `PLEXAR_BYO_API_KEY` to the key it returns, so the `byo` provider's `apiKeyEnv` always resolves.
  * @param {{fetchMeFn?: typeof fetchMe, resolveKeyFn?: typeof resolveKey}} [deps] - injected for tests.
  * @returns {Promise<{ok: true, key: string, models?: object[], allModels?: object[]} | {ok: false, message: string, exitCode: number}>}
  *   `models` is the serving chat models only (for the provider's model list); `allModels` is the
@@ -300,6 +302,16 @@ export async function logout() {
  *   settings page. Both are present only when `/me` answered 200 with a `models` array.
  */
 export async function checkGate({ fetchMeFn = fetchMe, resolveKeyFn = resolveKey } = {}) {
+  let byo;
+  try {
+    byo = byoConfig();
+  } catch (error) {
+    return { ok: false, message: error.message, exitCode: 1 };
+  }
+  if (byo) {
+    process.env.PLEXAR_BYO_API_KEY = byo.key;
+    return { ok: true, key: byo.key };
+  }
   const resolved = resolveKeyFn();
   if (!resolved) return { ok: false, message: 'Not signed in. Run: plexar-harness login', exitCode: 1 };
   let me;

@@ -8,62 +8,85 @@
 #   PLEXAR_HARNESS_KEY  bearer key minted by the rig (required off-loopback)
 #   PLEXAR_RIG_URL      rig base, default https://llm.plexar.tech
 #   PLEXAR_MODEL        served_model_name, default Qwen/Qwen3.6-35B-A3B
+#   PLEXAR_BYO_BASE_URL own OpenAI-compatible /v1 base; set = no Plexar sign-in, rig rows off
+#   PLEXAR_BYO_API_KEY  key for that endpoint (the launcher sends a placeholder when unset)
+#   PLEXAR_BYO_MODEL    model id served there (required with PLEXAR_BYO_BASE_URL)
+#   PLEXAR_BYO_CONTEXT / PLEXAR_BYO_MAX_TOKENS  its context window / output limit, default 131072 / 32768
 
 # ---- model route: the rig, via the OpenAI-compatible adapter --------------
 - id: llm-pi-ai
   config:
-    providers:
-      plexar:
-        displayName: Plexar Rig
-        apiKeyEnv: PLEXAR_HARNESS_KEY
-        api: openai-completions
-        # Preselected effort; the picker lists the model's levels with no separate "Default" row.
-        reasoning: high
-        baseURL: !!js (process.env.PLEXAR_RIG_URL ?? 'https://llm.plexar.tech') + '/v1'
-        retryPolicy:
-          mode: normal
-          maxRetries: 2
-        # The launcher puts the signed-in person's serving chat models (from /api/harness/me) in
-        # PLEXAR_HARNESS_MODELS; fields plexar-llm leaves null come from the table below, which is
-        # also the whole list when the variable is absent (offline start, developer key).
-        models: !!js |-
-          (() => {
-            const known = {
-              'Qwen/Qwen3.6-35B-A3B': {
-                name: 'Qwen3.6 35B', input: ['text', 'image'], contextWindow: 262144, maxTokens: 65536,
-                compat: { thinkingFormat: 'qwen-chat-template' }, reasoningEfforts: { off: null, high: 'high' },
-              },
-              'prism-ml/Ternary-Bonsai-2-27B': { name: 'Bonsai 2 27B', input: ['text', 'image'], contextWindow: 131072, maxTokens: 32768 },
+    # With PLEXAR_BYO_BASE_URL set only the `byo` route exists, so no request can reach the rig.
+    # Otherwise both routes are listed: `plexar` (the rig) and `byo`.
+    providers: !!js |-
+      (() => {
+        const byo = {
+          displayName: 'Own endpoint',
+          apiKeyEnv: 'PLEXAR_BYO_API_KEY',
+          api: 'openai-completions',
+          baseURL: process.env.PLEXAR_BYO_BASE_URL ?? 'http://localhost/v1',
+          models: (() => {
+            const contextWindow = Number(process.env.PLEXAR_BYO_CONTEXT ?? 131072);
+            const maxTokens = Number(process.env.PLEXAR_BYO_MAX_TOKENS ?? 32768);
+            const id = process.env.PLEXAR_BYO_MODEL ?? 'byo-model';
+            return [{ id, name: id, input: ['text'], contextWindow, maxTokens }];
+          })(),
+        };
+        if (process.env.PLEXAR_BYO_BASE_URL) return { byo };
+        // The launcher puts the signed-in person's serving chat models (from /api/harness/me) in
+        // PLEXAR_HARNESS_MODELS; fields plexar-llm leaves null come from the table below, which is
+        // also the whole list when the variable is absent (offline start, developer key).
+        const models = (() => {
+          const known = {
+            'Qwen/Qwen3.6-35B-A3B': {
+              name: 'Qwen3.6 35B', input: ['text', 'image'], contextWindow: 262144, maxTokens: 65536,
+              compat: { thinkingFormat: 'qwen-chat-template' }, reasoningEfforts: { off: null, high: 'high' },
+            },
+            'prism-ml/Ternary-Bonsai-2-27B': { name: 'Bonsai 2 27B', input: ['text', 'image'], contextWindow: 131072, maxTokens: 32768 },
+          };
+          const fromTable = id => ({ id, ...known[id] });
+          let served;
+          try { served = JSON.parse(process.env.PLEXAR_HARNESS_MODELS ?? 'null'); } catch (error) { served = null; }
+          if (!Array.isArray(served) || served.length === 0) {
+            const pinned = process.env.PLEXAR_MODEL;
+            return pinned && !known[pinned] ? [{ id: pinned, name: pinned }, ...Object.keys(known).map(fromTable)] : Object.keys(known).map(fromTable);
+          }
+          return served.map((m) => {
+            const k = known[m.id] ?? {};
+            const efforts = Array.isArray(m.reasoning_efforts) && m.reasoning_efforts.length > 0
+              ? Object.fromEntries(m.reasoning_efforts.map(level => [level, level === 'off' || level === 'none' ? null : level]))
+              : k.reasoningEfforts;
+            return {
+              id: m.id,
+              name: m.name ?? k.name ?? m.id,
+              input: Array.isArray(m.input) ? m.input : k.input ?? ['text'],
+              contextWindow: m.context_window ?? k.contextWindow ?? 131072,
+              // Without a served or known limit, a reply may use a quarter of the window (thinking included).
+              maxTokens: m.max_output_tokens ?? k.maxTokens ?? Math.floor((m.context_window ?? k.contextWindow ?? 131072) / 4),
+              ...k.compat ? { compat: k.compat } : {},
+              ...efforts ? { reasoningEfforts: efforts } : {},
             };
-            const fromTable = id => ({ id, ...known[id] });
-            let served;
-            try { served = JSON.parse(process.env.PLEXAR_HARNESS_MODELS ?? 'null'); } catch (error) { served = null; }
-            if (!Array.isArray(served) || served.length === 0) {
-              const pinned = process.env.PLEXAR_MODEL;
-              return pinned && !known[pinned] ? [{ id: pinned, name: pinned }, ...Object.keys(known).map(fromTable)] : Object.keys(known).map(fromTable);
-            }
-            return served.map((m) => {
-              const k = known[m.id] ?? {};
-              const efforts = Array.isArray(m.reasoning_efforts) && m.reasoning_efforts.length > 0
-                ? Object.fromEntries(m.reasoning_efforts.map(level => [level, level === 'off' || level === 'none' ? null : level]))
-                : k.reasoningEfforts;
-              return {
-                id: m.id,
-                name: m.name ?? k.name ?? m.id,
-                input: Array.isArray(m.input) ? m.input : k.input ?? ['text'],
-                contextWindow: m.context_window ?? k.contextWindow ?? 131072,
-                // Without a served or known limit, a reply may use a quarter of the window (thinking included).
-                maxTokens: m.max_output_tokens ?? k.maxTokens ?? Math.floor((m.context_window ?? k.contextWindow ?? 131072) / 4),
-                ...k.compat ? { compat: k.compat } : {},
-                ...efforts ? { reasoningEfforts: efforts } : {},
-              };
-            });
-          })()
+          });
+        })();
+        return {
+          plexar: {
+            displayName: 'Plexar Rig',
+            apiKeyEnv: 'PLEXAR_HARNESS_KEY',
+            api: 'openai-completions',
+            // Preselected effort; the picker lists the model's levels with no separate "Default" row.
+            reasoning: 'high',
+            baseURL: (process.env.PLEXAR_RIG_URL ?? 'https://llm.plexar.tech') + '/v1',
+            retryPolicy: { mode: 'normal', maxRetries: 2 },
+            models,
+          },
+          byo,
+        };
+      })()
 
 - id: agent-default-model
   config:
-    provider: plexar
-    model: !!js process.env.PLEXAR_MODEL ?? 'Qwen/Qwen3.6-35B-A3B'
+    provider: !!js process.env.PLEXAR_BYO_BASE_URL ? 'byo' : 'plexar'
+    model: !!js process.env.PLEXAR_BYO_BASE_URL ? process.env.PLEXAR_BYO_MODEL : process.env.PLEXAR_MODEL ?? 'Qwen/Qwen3.6-35B-A3B'
 
 # ---- persona ------------------------------------------------------------------
 - id: system-prompt
@@ -140,7 +163,7 @@
 - id: skill-filesystem
   config:
     customSkillDirs:
-      - !!js (process.env.PLEXAR_HARNESS_ROOT ?? 'C:/Code/Personal/plexar-harness') + '/packages/bundle/plexar/skills'
+      - !!js (process.env.PLEXAR_HARNESS_ROOT ?? '<harness-checkout>') + '/packages/bundle/plexar/skills'
 
 # ---- /rename <title>: session titles over any command adapter (CLI, Studio via ACP) ----
 - insert:
@@ -273,6 +296,22 @@
           - Get-Location
           - Test-Path
           - Select-String
+    # Small-model scaffolding: `lean` hides the subagent, workflow, goal and job tools
+    # from new agents; repairHints appends the tool's parameter schema to an
+    # invalid-arguments error. PLEXAR_TOOL_PROFILE=full restores every tool.
+    - id: plexar-tool-scaffold
+      name: '@plexar/dsh-plexar/tool-scaffold'
+      config:
+        toolProfile: !!js process.env.PLEXAR_TOOL_PROFILE ?? 'lean'
+        repairHints: true
+    # File tools outside the session workspace ask first, in every permission mode
+    # including full access. Shell commands are not fenced (no OS sandbox).
+    - id: plexar-workspace-fence
+      name: '@plexar/dsh-plexar/workspace-fence'
+      config:
+        enabled: true
+        outside: ask
+        extraRoots: []
 
 # ---- update service: exposes plexarUpdate over Remote for the sidebar notice ----
 - insert:
@@ -285,6 +324,8 @@
 - insert:
     - id: plexar-auth
       name: '@plexar/dsh-plexar/auth-remote'
+      # Rig-only: off with a BYO endpoint.
+      disabled: !!js Boolean(process.env.PLEXAR_BYO_BASE_URL)
 
 # ---- models service: exposes plexarModels over Remote for the Models settings page. Reads the
 # launcher's PLEXAR_HARNESS_ALL_MODELS snapshot; harmless (unavailable, empty lists) when unset,
@@ -292,6 +333,8 @@
 - insert:
     - id: plexar-models
       name: '@plexar/dsh-plexar/models'
+      # Rig-only: off with a BYO endpoint.
+      disabled: !!js Boolean(process.env.PLEXAR_BYO_BASE_URL)
 
 # ---- rig mid-session revocation (contract §10p): a /v1 403 whose body names
 # error.code "product_not_granted" means the rig revoked harness access after
@@ -300,6 +343,8 @@
 - insert:
     - id: plexar-revocation
       name: '@plexar/dsh-plexar/revocation'
+      # Rig-only: off with a BYO endpoint.
+      disabled: !!js Boolean(process.env.PLEXAR_BYO_BASE_URL)
 
 # ---- document tools: read_file/find_in_file/query_sheet/convert_document/extract_document/
 # create_document over MCP stdio, by file path. Spawns python/tools' plexar_tools.harness_mcp

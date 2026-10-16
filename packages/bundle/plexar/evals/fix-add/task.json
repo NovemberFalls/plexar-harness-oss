@@ -1,0 +1,1 @@
+{"id":"fix-add","prompt":"The test in add.test.js fails. Fix the bug in add.js so `node --test` passes. Do not edit the test.","timeoutSec":300,"check":{"cmd":["node","--test"]}}

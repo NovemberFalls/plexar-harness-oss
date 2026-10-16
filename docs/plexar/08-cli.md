@@ -34,6 +34,7 @@ plexar-harness --resume <id>  resume a session by id
 plexar-harness export <id>    print a session as text (09-session-export.md)
 plexar-harness acp            run the ACP profile on stdio for Plexar Studio (07-studio-api-contract.md, "Launch")
 plexar-harness update         pull the latest harness, reinstall, rebuild
+plexar-harness eval           run the built-in task suite and score it (--list, --task, --json)
 plexar-harness web            open the browser UI (--port N, --no-open)
 plexar-harness login          sign in to Plexar (--no-browser for a pasted code)
 plexar-harness logout         sign out and remove the stored key
@@ -49,6 +50,7 @@ plexar-harness logout         sign out and remove the stored key
 | `-m`, `--mode <ask\|auto-edit\|full-access>` | Permission mode for the session (see "Permission modes"). Default: the last mode chosen interactively, else `auto-edit`; `-p` defaults to `auto-edit`. |
 | `--read-only` | Same as `--mode ask`. |
 | `--no-thinking` | Collapse thinking to one `✻ thinking…` line per block. |
+| `--timings` | Show startup phase times and, per turn, first-token time and output rate (also `PLEXAR_HARNESS_TIMINGS=1`). See "Timings". |
 | `--cwd <dir>` | Workspace folder. Default: the current folder. |
 | `-v`, `--version` | Print the bundle version. |
 | `-h`, `--help` | Print usage. |
@@ -57,7 +59,7 @@ Environment: `PLEXAR_HARNESS_SETTINGS` overrides the settings file path. `PLEXAR
 
 ## Launch
 
-On a terminal the client clears the screen, shows an animated `Waking the harness…` line, then draws the header. The first launch in a folder shows the attention mark and asks "Do you trust the files in this folder?" as an arrow-key choice. Yes is saved for that folder and every folder inside it; No exits without starting the harness. `-p` and piped input skip the question.
+On a terminal the client clears the screen, shows an animated working line whose label names the current startup phase (`Checking sign-in…`, `Starting harness…`, `Opening session…`), then draws the header. The first launch in a folder shows the attention mark and asks "Do you trust the files in this folder?" as an arrow-key choice. Yes is saved for that folder and every folder inside it; No exits without starting the harness. `-p` and piped input skip the question.
 
 ## Terminal UI
 
@@ -138,9 +140,49 @@ On exit the client prints `resume with: plexar-harness --resume <id>`. Sessions 
 | `usage_update` | Kept for the turn footer |
 | any other kind | Not drawn |
 
-Each turn ends with a footer: `<used>/<size> ctx (<pct>%) · <seconds>s`, plus the stop reason when it is not `end_turn`.
+Each turn ends with a footer: `<used>/<size> ctx (<pct>%) · <seconds>s`, then `first token <seconds>s` and `<n> tok/s` when known, then the stop reason when it is not `end_turn`. First token is the time from sending the prompt to the first thought or answer chunk. The rate is the growth of `used` during the turn divided by the time from first token to turn end, so it is omitted without a `usage_update` or a first token. `-p` prints the footer to stderr, and only with `--timings`.
 
 Permission requests (`session/request_permission`) list the harness's options by number. Enter picks the first option. The chosen `optionId` is sent back, and an unknown number cancels the request.
+
+## Timings
+
+`--timings` (or `PLEXAR_HARNESS_TIMINGS=1`) adds two measurements. After the header of an interactive launch, a dim line lists the measured startup phases in order, for example `startup: sign-in 0.4s · harness 3.1s · session 0.6s`. The harness phase runs from spawning the profile to its initialize result. The per-turn footer ("What it draws") is always shown interactively; `-p` prints it only with `--timings`, on stderr, so stdout carries only the answer.
+
+## Bring your own endpoint
+
+Setting `PLEXAR_BYO_BASE_URL` runs the harness against any OpenAI-compatible endpoint with no Plexar sign-in, keyring lookup, `/me` call or rig traffic.
+
+| Variable | Meaning |
+|---|---|
+| `PLEXAR_BYO_BASE_URL` | The full `/v1` base, used as given. Setting it turns BYO on. |
+| `PLEXAR_BYO_MODEL` | Model id served there. Required with the base URL; without it the gate fails with a message naming this variable. |
+| `PLEXAR_BYO_API_KEY` | Bearer key for that endpoint. When unset, the launcher sends the placeholder `plexar-byo-no-key`. |
+| `PLEXAR_BYO_CONTEXT` | Context window in tokens. Default 131072. |
+| `PLEXAR_BYO_MAX_TOKENS` | Output limit in tokens. Default 32768. |
+
+```sh
+export PLEXAR_BYO_BASE_URL=http://localhost:8080/v1
+export PLEXAR_BYO_MODEL=qwen3-27b
+plexar-harness -p "list the TODOs in this folder"
+```
+
+With BYO on, `checkGate()` passes with the BYO key and sets `PLEXAR_BYO_API_KEY` to it. The bundle's `byo` provider is the default model route, and `plexar-auth`, `plexar-models` and `plexar-revocation` are disabled. The `acp` and `web` launches accept the BYO key in place of `PLEXAR_HARNESS_KEY`, and the `acp` preflight probes `<base>/models` instead of the rig.
+
+## Eval
+
+`plexar-harness eval` runs the tasks in `packages/bundle/plexar/evals/<id>/task.json` and scores each with its check command.
+
+| Flag | Effect |
+|---|---|
+| `--list` | Print each task as `id`, timeout and the first prompt line, then exit 0. |
+| `--task <id>` | Run only this task; repeatable. An unknown id exits 2. |
+| `--model <id>`, `--effort <level>` | Passed to each `plexar-harness -p` run. |
+| `--repeat N` | Run each task N times (positive integer). |
+| `--json` | Print the summary as JSON. |
+
+A task file is `{id, prompt, timeoutSec, check: {cmd: string[]}}`, with an optional `files/` directory beside it. Each run copies `files/` into a fresh temporary folder, runs the harness there with `-p ... --mode full-access`, and kills it after `timeoutSec`. It then runs `check.cmd` in that folder (`node` means the current Node); exit 0 is a pass, and a timeout is a failure. The environment variable `PLEXAR_EVAL_HARNESS` replaces the spawned entry script.
+
+Each invocation appends one JSON line, `{model, results: [{id, pass, ms, exit, attempt}], passRate}`, to `<PLEXAR_EVAL_DIR, default ~/.dsh/plexar-evals>/<YYYY-MM-DD>.jsonl`. The exit code is 0 when every run passed, 1 when any failed, and 2 for a bad flag or unknown task.
 
 ## Exit codes
 

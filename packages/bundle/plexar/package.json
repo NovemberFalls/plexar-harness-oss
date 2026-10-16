@@ -27,6 +27,14 @@
       "types": "./lib/types/feature-toggles.d.ts",
       "default": "./lib/types/feature-toggles.js"
     },
+    "./tool-scaffold": {
+      "types": "./lib/types/tool-scaffold.d.ts",
+      "default": "./lib/types/tool-scaffold.js"
+    },
+    "./workspace-fence": {
+      "types": "./lib/types/workspace-fence.d.ts",
+      "default": "./lib/types/workspace-fence.js"
+    },
     "./revocation": {
       "types": "./lib/types/revocation.d.ts",
       "default": "./lib/types/revocation.js"
@@ -64,6 +72,8 @@
     "lib/types/git-bash.js",
     "lib/types/command-approval.js",
     "lib/types/feature-toggles.js",
+    "lib/types/tool-scaffold.js",
+    "lib/types/workspace-fence.js",
     "lib/types/revocation.js",
     "lib/types/update.js",
     "lib/types/auth-remote.js",

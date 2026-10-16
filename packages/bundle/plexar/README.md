@@ -34,6 +34,25 @@ DeepSeek cloud model + account + web search + telemetry; plugin marketplace;
 ralph loop. Everything else in base stays: bash/pwsh sandbox, fs tools,
 skills, plan mode, compaction, subagents, MCP, web fetch.
 
+## Plugins
+
+- `plexar-tool-scaffold` (`src/tool-scaffold.ts`): `toolProfile` (`lean` in the bundle row, from `PLEXAR_TOOL_PROFILE`; `full` restores every tool), `leanDeny`, `repairHints`, `schemaHintMaxChars`. Lean hides the subagent, workflow, goal and job tools; repair hints append the parameter schema to invalid-argument errors.
+- `plexar-workspace-fence` (`src/workspace-fence.ts`): `enabled`, `outside` (`ask` or `deny`), `extraRoots`, `tools`. File tools outside the session workspace ask or are denied in every permission mode; shell tools are not fenced.
+
+## Bring your own endpoint
+
+`PLEXAR_BYO_BASE_URL` (a full `/v1` base) plus `PLEXAR_BYO_MODEL` selects the `byo` provider and skips Plexar sign-in and the rig. Optional: `PLEXAR_BYO_API_KEY`, `PLEXAR_BYO_CONTEXT` (131072), `PLEXAR_BYO_MAX_TOKENS` (32768). `plexar-auth`, `plexar-models` and `plexar-revocation` are disabled.
+
+```sh
+export PLEXAR_BYO_BASE_URL=http://localhost:8080/v1
+export PLEXAR_BYO_MODEL=qwen3-27b
+plexar-harness -p "list the TODOs in this folder"
+```
+
+## Eval and timings
+
+`plexar-harness eval` runs `evals/<id>/task.json` tasks and appends a pass-rate line to `~/.dsh/plexar-evals/<date>.jsonl`; `--timings` shows startup phases and per-turn first-token time and rate. Details: `docs/plexar/08-cli.md`.
+
 ## Rebase
 
 `git fetch upstream && git rebase upstream/main` — this bundle lives only in
@@ -55,8 +74,8 @@ desktop app's own updater or `https://harness.plexar.tech` instead.
   silently with no output. This box runs 24.19.
 - **Source mode needs the repo tsconfig.** `pnpm dsh` resolves `@deepseek-ai/*` to `src/`
   through tsconfig paths. Running from another cwd (your real workspace) requires
-  `TSX_TSCONFIG_PATH=C:/path/to/plexar-harness/tsconfig.json` and the absolute loader:
-  `node --import file:///C:/path/to/plexar-harness/node_modules/tsx/dist/esm/index.mjs C:/path/to/plexar-harness/apps/cli/src/bin.ts --profile plexar "<task>"`.
+  `TSX_TSCONFIG_PATH=<harness-checkout>/tsconfig.json` and the absolute loader:
+  `node --import file:///<harness-checkout>/node_modules/tsx/dist/esm/index.mjs <harness-checkout>/apps/cli/src/bin.ts --profile plexar "<task>"`.
 - **`typert-loader` warns "1 entry did not activate"** in source mode because `lib/typert.host.js`
   is unbuilt. Harmless for headless runs; goes away with a built `lib/`.
 - **Rig key.** Off-loopback the rig requires a bearer. `PLEXAR_HARNESS_KEY` is minted (2026-09-22): rig key `key_9dfcca42cccd49db`, label

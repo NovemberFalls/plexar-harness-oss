@@ -63,11 +63,16 @@ export class HarnessRuntime extends EventEmitter {
     this.pending = new Map();
     this.stderrTail = [];
     this.child = null;
+    /** `Date.now()` when the profile process was spawned; null before `start()`. */
+    this.spawnedAt = null;
+    /** `Date.now()` when `initialize` returned; null until the agent is ready. */
+    this.readyAt = null;
   }
 
   /** Spawn the profile and run `initialize`. @returns {Promise<object>} the agent's initialize result */
   async start() {
     const entry = dshEntry(harnessRoot());
+    this.spawnedAt = Date.now();
     this.child = spawn(process.execPath, [...entry.args, '--profile', this.profile], {
       cwd: this.workspace,
       env: { ...process.env, ...entry.env, ...this.env },
@@ -94,10 +99,12 @@ export class HarnessRuntime extends EventEmitter {
       this.pending.clear();
       this.emit('exit', code);
     });
-    return this.request('initialize', {
+    const result = await this.request('initialize', {
       protocolVersion: PROTOCOL_VERSION,
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
     });
+    this.readyAt = Date.now();
+    return result;
   }
 
   /** Close stdin and wait for the child to exit; sessions stay on disk. */

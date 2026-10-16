@@ -1,0 +1,1 @@
+{"id":"json-config","prompt":"In config.json set the key `retries` to 5 and leave every other key unchanged.","timeoutSec":180,"check":{"cmd":["node","-e","const c=JSON.parse(require(\"fs\").readFileSync(\"config.json\",\"utf8\"));process.exit(c.retries===5&&c.name===\"svc\"&&c.timeoutMs===3000&&c.nested.flag===true?0:1)"]}}

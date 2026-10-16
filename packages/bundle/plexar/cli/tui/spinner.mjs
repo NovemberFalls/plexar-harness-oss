@@ -64,6 +64,11 @@ export class Spinner {
     this.draw();
   }
 
+  /** Change the label of a running spinner without resetting its elapsed counter. */
+  setLabel(label) {
+    this.label = label;
+  }
+
   line() {
     const elapsed = Math.floor((Date.now() - this.started) / 1000);
     const phrase = this.label || `${this.phrases[Math.floor((Date.now() - this.started) / PHRASE_MS) % this.phrases.length]}…`;

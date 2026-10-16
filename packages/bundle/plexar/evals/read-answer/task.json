@@ -1,0 +1,1 @@
+{"id":"read-answer","prompt":"Read data.txt, which has one integer per line. Write the sum of all the integers to answer.txt as just the number.","timeoutSec":180,"check":{"cmd":["node","-e","process.exit(require(\"fs\").readFileSync(\"answer.txt\",\"utf8\").trim()===\"142\"?0:1)"]}}
