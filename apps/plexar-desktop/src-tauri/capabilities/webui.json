@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "webui",
+  "description": "The Host Web UI on its loopback origin may drive the in-app browser panes and listen for their events. Nothing else.",
+  "local": false,
+  "webviews": ["main"],
+  "remote": {
+    "urls": ["http://127.0.0.1:*"]
+  },
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-browser-pane-open",
+    "allow-browser-pane-adopt",
+    "allow-browser-pane-navigate",
+    "allow-browser-pane-command",
+    "allow-browser-pane-set-bounds",
+    "allow-browser-pane-close",
+    "allow-browser-pane-list"
+  ]
+}

@@ -1,7 +1,7 @@
 /**
  * Layout plugin, browser half: one register() call contributes AppFrame into
  * the runtime's built-in 'root' slot and, in the same breath, declares the
- * five child slots (declaration = exclusive render authority), seats the
+ * six child slots (declaration = exclusive render authority), seats the
  * layout store (panel geometry), and wires the panel-action service face.
  * ctx.layout selects the main panel and controls column geometry; Session
  * selection belongs to the Session Controller. A second effect seats the theme
@@ -45,7 +45,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
   interface SlotMap {
     // The 'root' entry itself is the runtime's built-in slot (declared
-    // there); these five are the frame's children, declared by the same
+    // there); these six are the frame's children, declared by the same
     // register() call that contributes AppFrame. Session owners never pass
     // sessionId: the framework injects it as a standard prop.
     /**
@@ -78,6 +78,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * occupant decides when to render its Session-bound content.
      */
     'rightbar': { kind: 'single'; scope: 'root'; owner: RightbarOwnerProps }
+    /**
+     * The environment rail: a fixed 280px column right of the right column,
+     * never an overlay, so the right column moves left while it is shown.
+     * The frame gives it a grid track only while an entry occupies this slot,
+     * `ctx.layout` reports it shown, the right panel is not fullscreen, and the
+     * center can keep its minimum beside it; it has no resize handle. The
+     * show/hide control is the occupant's own (`ctx.layout.toggleEnvbar()`).
+     */
+    'envbar': { kind: 'single'; scope: 'root' }
     /**
      * Frame-wide floating layer, above every column and outside their scroll
      * containers. Deliberately generic and unowned by any feature: a badge, a
@@ -137,7 +146,7 @@ export const inject = ['slots', 'theme', 'locale']
 
 /**
  * Client plugin body: provide ctx.layout, then one register() call — AppFrame
- * into 'root' with the five child-slot declarations, the layout store seat,
+ * into 'root' with the six child-slot declarations, the layout store seat,
  * and the shared root instance supplying commands and the panel-info source.
  * @param ctx - client root context.
  */
@@ -165,6 +174,7 @@ export function apply(ctx: ClientContext): void {
         'sidebar': { kind: 'single', scope: 'root' },
         'main': { kind: 'keyed', scope: 'root' },
         'rightbar': { kind: 'single', scope: 'root' },
+        'envbar': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.leading': { kind: 'single', scope: 'root' },
       },
@@ -172,8 +182,15 @@ export function apply(ctx: ClientContext): void {
     }, AppFrame)
     const disposePanels = ctx.slots.subscribe('main', retainMainPanels)
     retainMainPanels()
+    // The rail's track exists only while something occupies it.
+    const syncEnvbar = (): void => {
+      instance.actions.setEnvbarOccupied(ctx.slots.entries('envbar').length > 0)
+    }
+    const disposeEnvbar = ctx.slots.subscribe('envbar', syncEnvbar)
+    syncEnvbar()
     return () => {
       layout.dispose()
+      disposeEnvbar()
       disposePanels()
       disposeRegistration()
       disposePanelInfo()

@@ -41,6 +41,15 @@ import {
   subagentModelSelectionPolicy,
 } from './model-selection-state.ts'
 
+declare module '@deepseek-ai/dsh-agent' {
+  interface AgentOptions {
+    /** Role a delegation tool stamped on this child (`Config.agentRole`); not inherited by its own children. */
+    subagentRole?: string
+    /** Value of the delegation tool's `Config.variant` argument for this child; not inherited by its own children. */
+    subagentVariant?: string
+  }
+}
+
 export const name = 'tool-subagent'
 export const inject = ['tools', 'subagents', 'systemPrompt', 'sessionProjections']
 
@@ -53,6 +62,31 @@ export interface Config {
    * a distinct name.
    */
   toolName?: string
+  /**
+   * Model-facing tool description replacing the provider wording; the background
+   * and model-selection sentences still follow it.
+   */
+  description?: string
+  /**
+   * Role stamped on every child as `AgentOptions.subagentRole`, so composition
+   * hooks can tell this instance's children from other delegations. Requires the
+   * provider's `agentOptions` capability. Live only: a cold-resumed continuable
+   * child is rebuilt from its descriptor and carries no role.
+   */
+  agentRole?: string
+  /**
+   * One optional enum argument the model passes, stamped on the child as
+   * `AgentOptions.subagentVariant` (the default when omitted). Requires the
+   * provider's `agentOptions` capability; live only, like `agentRole`.
+   */
+  variant?: {
+    /** Argument name. */
+    parameter: string
+    /** Model-facing argument description. */
+    description: string
+    /** Allowed values; the first is the default. */
+    values: string[]
+  }
   /**
    * Sample the Host `subagent-model-selection` setting for each new top-level
    * Session and inherit that decision in its child Sessions.
@@ -106,6 +140,13 @@ export interface Config {
 export const Config: z<Config> = z.object({
   provider: z.string().required(),
   toolName: z.string().default('subagent'),
+  description: z.string(),
+  agentRole: z.string().min(1),
+  variant: z.object({
+    parameter: z.string().min(1).required(),
+    description: z.string().required(),
+    values: z.array(z.string().min(1)).min(1).required(),
+  }).default(undefined as unknown as { parameter: string; description: string; values: string[] }),
   modelSelectionSettings: z.boolean().default(false),
   enableRunInBackground: z.boolean().default(true),
   backgroundMode: z.union(['one-shot', 'continuable'] as const).default('one-shot'),
@@ -333,7 +374,8 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
         + 'set maxDepth: \'provider-managed\' to leave the recursion budget to the provider',
       )
     }
-    if (config.agentOptions !== undefined && !subagentProvider.capabilities.agentOptions) {
+    const stampsChildOptions = config.agentOptions !== undefined || config.agentRole !== undefined || config.variant !== undefined
+    if (stampsChildOptions && !subagentProvider.capabilities.agentOptions) {
       throw new Error(
         `tool-subagent: provider "${subagentProvider.name}" does not support child agentOptions`,
       )
@@ -379,7 +421,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
             : '')
       const disposeTool = runtimeCtx.tools.register(defineTool({
         name: toolName,
-        description: wording.description + (backgroundEnabled
+        description: (config.description ?? wording.description) + (backgroundEnabled
           // The completion notice is the continuation service's own behavior, not
           // a separately installed capability, so this promise holds whenever the
           // continuable background path is reachable at all.
@@ -416,6 +458,13 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
               description: providerRouteDefaults !== undefined
                 ? 'Adapter-owned reasoning effort for the effective child route. Omit to use a compatible configured effort or the selected model\'s default.'
                 : 'Adapter-owned reasoning effort for the effective child route. Omit to inherit a compatible configured/parent effort or use a newly selected model\'s default.',
+            },
+          } : {},
+          ...config.variant !== undefined ? {
+            [config.variant.parameter]: {
+              type: 'string' as const,
+              enum: config.variant.values,
+              description: config.variant.description,
             },
           } : {},
           ...backgroundEnabled ? {
@@ -483,12 +532,28 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
           const configuredChildAgentOptions = requiresRoutePreflight && providerRouteDefaults !== undefined
             ? { ...providerRouteDefaults, ...config.agentOptions }
             : config.agentOptions
-          const requestedChildAgentOptions = requestedAgentOptions(
+          const selectedChildAgentOptions = requestedAgentOptions(
             parentOptions,
             configuredChildAgentOptions,
             modelRequest,
             modelSelectionEnabled,
           )
+          let variant: string | undefined
+          if (config.variant !== undefined) {
+            const value = (args as Record<string, unknown>)[config.variant.parameter] ?? config.variant.values[0]
+            // The validator permits undeclared keys and may not check enums; reject anything outside the list.
+            if (typeof value !== 'string' || !config.variant.values.includes(value)) {
+              throw new Error(`${config.variant.parameter} must be one of ${config.variant.values.join(', ')}`)
+            }
+            variant = value
+          }
+          const requestedChildAgentOptions = config.agentRole === undefined && variant === undefined
+            ? selectedChildAgentOptions
+            : {
+              ...selectedChildAgentOptions,
+              ...config.agentRole === undefined ? {} : { subagentRole: config.agentRole },
+              ...variant === undefined ? {} : { subagentVariant: variant },
+            }
           assertAllowedModelSelection(
             modelSelectionPolicy,
             parentOptions,

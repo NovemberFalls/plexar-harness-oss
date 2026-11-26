@@ -47,7 +47,7 @@ pnpm dsh --profile plexar "run the tests"
 pnpm dsh --profile plexar --json "summarize this repo" > events.jsonl
 ```
 
-`PLEXAR_RIG_URL` overrides `https://llm.plexar.tech`; `PLEXAR_MODEL` overrides `Qwen/Qwen3.6-35B-A3B`. For `plexar-web`: build first (`pnpm run build`, Node 24), then `pnpm dsh --profile plexar-web`, opens `http://127.0.0.1:3080`. Source-mode gotchas (Node ≥ 22.19/24 required, `TSX_TSCONFIG_PATH` for out-of-repo invocation, harmless `typert-loader` warning, WireGuard hijacking `the LAN subnet`) are recorded verbatim in `packages/bundle/plexar/README.md` and cross-referenced in `docs/plexar/04-configuration-and-plugins.md` section 5.
+`PLEXAR_RIG_URL` overrides `https://llm.plexar.tech`; `PLEXAR_MODEL` overrides `Qwen/Qwen3.6-35B-A3B`. For `plexar-web`: build first (`pnpm run build`, Node 24), then `pnpm dsh --profile plexar-web`, opens `http://127.0.0.1:3080`. Source-mode gotchas (Node ≥ 22.19/24 required, `TSX_TSCONFIG_PATH` for out-of-repo invocation, harmless `typert-loader` warning, WireGuard hijacking `<rig-lan-address>/24`) are recorded verbatim in `packages/bundle/plexar/README.md` and cross-referenced in `docs/plexar/04-configuration-and-plugins.md` section 5.
 
 ## 2. Capability matrix
 

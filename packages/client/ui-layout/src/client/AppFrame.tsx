@@ -11,7 +11,12 @@
  * to the frame's right edge at the resolved normal width, and the
  * track only decides whether the centre makes room for it. The occupant reports
  * shown/track/fullscreen through `ctx.layout`; fullscreen keeps the reported
- * track but hides the outer resize handle. Everything arrives through the framework
+ * track but hides the outer resize handle.
+ *
+ * While the `envbar` slot is occupied the frame gains a fourth track right of
+ * the right column: the environment rail, a fixed width or zero, with no
+ * handle. Without an occupant the template keeps its three tracks, so the
+ * three-column behaviour is untouched. Everything arrives through the framework
  * shares — zero cordis or framework imports, zero self-made hooks.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -19,7 +24,7 @@ import type { ReactNode } from 'react'
 import type {
   PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
+import { CENTER_MIN, clampWidth, computeColumns, ENVBAR_WIDTH, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
@@ -27,7 +32,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.overlay' | 'shell.leading'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'envbar' | 'shell.overlay' | 'shell.leading'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
 
@@ -67,6 +72,11 @@ function ConversationMarker({ usePanelInfo, frameRef }: Pick<PropsRuntime<'root'
  */
 function RightbarColumn(props: { children?: ReactNode }) {
   return <div className={css.rightbarCol} data-rightbar-col>{props.children}</div>
+}
+
+/** Environment rail grid item: clips its occupant to the track, which is zero while hidden. */
+function EnvbarColumn(props: { children?: ReactNode }) {
+  return <div className={css.envbarCol} data-envbar-col>{props.children}</div>
 }
 
 /**
@@ -186,10 +196,16 @@ export function AppFrame({
   const darwin = document.documentElement.dataset.platform === 'darwin'
   const collapsedWidth = darwin
     || document.documentElement.hasAttribute('data-windows-titlebar') ? 0 : SIDEBAR_COLLAPSED
+  // The rail asks for its track only with an occupant, a shown request, and a
+  // right panel that is not covering the frame; the solve may still refuse it.
+  const envbarRequest = layoutInfo.envbarOccupied && layoutInfo.envbarShown && !layoutInfo.rightbarFullscreen
+    ? ENVBAR_WIDTH : 0
   // Opening on a narrow frame collapses the left sidebar. Eligibility must
   // include that space before the occupant's first shown report arrives.
-  const normal = computeColumns(viewport, !layoutInfo.rightbarShown && narrow ? 0 : sidebarPreference, rightbarPreference, collapsedWidth)
-  const cols = computeColumns(viewport, sidebarPreference, layoutInfo.rightbarTrack ? rightbarPreference : 0, collapsedWidth)
+  const normalSidebar = !layoutInfo.rightbarShown && narrow ? 0 : sidebarPreference
+  const normal = computeColumns(viewport, normalSidebar, rightbarPreference, collapsedWidth, envbarRequest)
+  const cols = computeColumns(viewport, sidebarPreference, layoutInfo.rightbarTrack ? rightbarPreference : 0, collapsedWidth, envbarRequest)
+  const envbar = cols.envbar ?? 0
   const colsRef = useRef(cols)
   colsRef.current = cols
   const rightbarWidth = useRef(normal.rightbar)
@@ -212,7 +228,7 @@ export function AppFrame({
   // chase the live window edge. The counter restarts the settle window when a
   // re-toggle interrupts a running transition.
   const [animating, setAnimating] = useState(0)
-  const trackToggle = `${sidebarCollapsed}:${layoutInfo.rightbarTrack}`
+  const trackToggle = `${sidebarCollapsed}:${layoutInfo.rightbarTrack}:${envbar > 0}`
   const previousToggle = useRef(trackToggle)
   const previousViewport = useRef(viewport)
   useLayoutEffect(() => {
@@ -272,6 +288,8 @@ export function AppFrame({
   // --dsh-frame-leading-clearance under the same collapsed condition.
   const leading = useMemo(() => renderSlot('shell.leading', {}), [renderSlot])
   const leadingMounted = darwin && sidebarCollapsed
+  const envbarContent = useMemo(() => renderSlot('envbar', {}), [renderSlot])
+  const template = `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`
 
   return (
     <div
@@ -280,13 +298,13 @@ export function AppFrame({
       style={{
         ...(document.documentElement.hasAttribute('data-windows-titlebar')
           ? { '--dsh-windows-sidebar-width': `${cols.sidebar}px` } : {}),
-        gridTemplateColumns:
-          `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
+        gridTemplateColumns: layoutInfo.envbarOccupied ? `${template} ${envbar}px` : template,
       }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-rightbar-collapsed={cols.rightbar === 0 || undefined}
       data-rightbar-fullscreen={layoutInfo.rightbarFullscreen || undefined}
       data-rightbar-instant={layoutInfo.rightbarInstant || undefined}
+      data-envbar-collapsed={(layoutInfo.envbarOccupied && envbar === 0) || undefined}
       data-dragging={dragging || undefined}
       data-animating={animating > 0 || undefined}
     >
@@ -308,6 +326,7 @@ export function AppFrame({
         <RightbarColumn>
           {renderSlot('rightbar', { width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 })}
         </RightbarColumn>
+        {layoutInfo.envbarOccupied && <EnvbarColumn>{envbarContent}</EnvbarColumn>}
       </>
       <div className={css.overlayLayer} data-shell-overlay>
         {overlays}
@@ -320,7 +339,7 @@ export function AppFrame({
       {/* The collapsed rail is fixed-width: no resize handle while closed. */}
       {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
       {layoutInfo.rightbarShown && !layoutInfo.rightbarFullscreen && normal.rightbar > 0 && (
-        <DragHandle side="rightbar" left={viewport - normal.rightbar} onStart={onRightbarStart} onDrag={onRightbarDrag} onEnd={onDragEnd} />
+        <DragHandle side="rightbar" left={viewport - envbar - normal.rightbar} onStart={onRightbarStart} onDrag={onRightbarDrag} onEnd={onDragEnd} />
       )}
     </div>
   )

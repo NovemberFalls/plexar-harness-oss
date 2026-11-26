@@ -16,7 +16,7 @@
 
 import type { Context, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { scopeOf } from '@deepseek-ai/dsh-scope'
+import { denyForAgent } from './tool-scaffold.ts'
 import type {} from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-settings'
@@ -53,23 +53,28 @@ export function hiddenTools(
   }
 }
 
+/** Tool-less switches the browser bridge reads (`useMyChrome`, `inAppBrowser`), known even when `features` omits them. */
+export const BRIDGE_FEATURES: Readonly<Record<string, string[]>> = { useMyChrome: [], inAppBrowser: [] }
+
 /**
  * Validate the configuration and mask off features' tools on each new agent.
  * @param ctx - the plugin context.
  * @param config - the resolved plugin configuration.
  */
 export function apply(ctx: Context, config: Config): void {
-  const unknownAtLoad = hiddenTools(config.features, config.off.get() ?? []).unknown
-  if (unknownAtLoad.length > 0) throw new Error(`plexar-feature-toggles: off names unknown feature ${unknownAtLoad.join(', ')}`)
+  // A saved Features setting may carry a `features` table from an older bundle; the browser bridge's tool-less
+  // switches stay known whatever it lists, and an unknown id is reported rather than failing the load (a failed
+  // load drops the `off` setting the browser bridge reads, which turns "Use my Chrome" back on).
+  const features = { ...BRIDGE_FEATURES, ...config.features }
+  const unknownAtLoad = hiddenTools(features, config.off.get() ?? []).unknown
+  if (unknownAtLoad.length > 0) ctx.logger.error(`off names unknown feature ${unknownAtLoad.join(', ')}; its tools stay visible`)
   // Settings > Features is this namespace's page; no generated form.
   ctx.inject(['settings'], (child) => { child.effect(() => child.settings.configure({ auto: false }, ctx.fiber)) })
   ctx.on('agent/created', ({ agent }) => {
     // The setting changed after load; an unknown id is reported here rather than failing agent creation.
-    const { tools: hidden, unknown } = hiddenTools(config.features, config.off.get() ?? [])
+    const { tools: hidden, unknown } = hiddenTools(features, config.off.get() ?? [])
     if (unknown.length > 0) ctx.logger.error(`off names unknown feature ${unknown.join(', ')}; its tools stay visible`)
-    const scope = scopeOf(agent.ctx)
-    const visible = hidden.filter(tool => agent.ctx.tools.get(tool, scope) !== undefined)
-    if (visible.length > 0) agent.ctx.tools.restrict({ deny: visible })
+    denyForAgent(agent.ctx, hidden)
     return undefined
   })
 }

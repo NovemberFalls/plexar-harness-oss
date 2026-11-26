@@ -21,6 +21,8 @@ describe('createLayoutStore', () => {
         rightbarTrack: false,
         rightbarFullscreen: false,
         rightbarInstant: false,
+        envbarShown: false,
+        envbarOccupied: false,
       },
     })
   })
@@ -288,5 +290,40 @@ describe('right panel instant geometry', () => {
     actions.closeRightbar()
     actions.openRightbar(true, fullscreen)
     expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: true, rightbarFullscreen: fullscreen, rightbarInstant: false })
+  })
+})
+
+describe('environment rail state', () => {
+  it('opens, closes and toggles the request without touching the right panel', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.openRightbar(true, false)
+    const before = store.getSnapshot().layoutInfo
+    actions.openEnvbar()
+    expect(store.getSnapshot().layoutInfo.envbarShown).toBe(true)
+    actions.toggleEnvbar()
+    expect(store.getSnapshot().layoutInfo.envbarShown).toBe(false)
+    actions.toggleEnvbar()
+    expect(store.getSnapshot().layoutInfo.envbarShown).toBe(true)
+    actions.closeEnvbar()
+    const after = store.getSnapshot().layoutInfo
+    expect(after.envbarShown).toBe(false)
+    expect({ ...after, envbarShown: before.envbarShown }).toEqual(before)
+  })
+
+  it('records occupancy separately from the shown request', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.setEnvbarOccupied(true)
+    expect(store.getSnapshot().layoutInfo).toMatchObject({ envbarOccupied: true, envbarShown: false })
+    actions.setEnvbarOccupied(false)
+    expect(store.getSnapshot().layoutInfo.envbarOccupied).toBe(false)
+  })
+
+  it('a rail toggle ends the fullscreen-exit instant window like any geometry action', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.openRightbar(true, true)
+    actions.openRightbar(true, false)
+    expect(store.getSnapshot().layoutInfo.rightbarInstant).toBe(true)
+    actions.toggleEnvbar()
+    expect(store.getSnapshot().layoutInfo.rightbarInstant).toBe(false)
   })
 })

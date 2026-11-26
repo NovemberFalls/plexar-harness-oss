@@ -1,7 +1,7 @@
 {
   "name": "@plexar/dsh-plexar",
   "description": "Plexar coding profile: dsh-base + dsh-headless routed to the Plexar rig (Qwen/Qwen3.6-35B-A3B), with every DeepSeek-cloud row switched off",
-  "version": "0.4.6",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -78,6 +78,7 @@
     "lib/types/update.js",
     "lib/types/auth-remote.js",
     "lib/types/models.js",
+    "lib/types/browser-agent.js",
     "lib/types/browser-bridge/*.js",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",

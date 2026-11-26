@@ -91,6 +91,26 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('rightbar')).toEqual({ kind: 'single', scope: 'root' })
     expect(slots.spec('shell.overlay')).toEqual({ kind: 'list', scope: 'root' })
     expect(slots.spec('shell.leading')).toEqual({ kind: 'single', scope: 'root' })
+    expect(slots.spec('envbar')).toEqual({ kind: 'single', scope: 'root' })
+  })
+
+  it('records envbar occupancy from the slot registry and forwards rail requests', async () => {
+    const { ctx, slots } = await bench()
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const instance = (slots.entries('root')[0]!.store as ReturnType<typeof createLayoutStore>).create()
+    expect(instance.getSnapshot().layoutInfo.envbarOccupied).toBe(false)
+    const dispose = slots.register({ name: 'envbar' }, () => null)
+    await vi.waitFor(() => { expect(instance.getSnapshot().layoutInfo.envbarOccupied).toBe(true) })
+    const layout = ctx.get('layout') as LayoutController
+    layout.toggleEnvbar()
+    expect(instance.getSnapshot().layoutInfo.envbarShown).toBe(true)
+    layout.closeEnvbar()
+    expect(instance.getSnapshot().layoutInfo.envbarShown).toBe(false)
+    layout.openEnvbar()
+    expect(instance.getSnapshot().layoutInfo.envbarShown).toBe(true)
+    dispose()
+    await vi.waitFor(() => { expect(instance.getSnapshot().layoutInfo.envbarOccupied).toBe(false) })
   })
 
   it('shares a pre-created instance between service actions, root rendering, and panelInfo', async () => {

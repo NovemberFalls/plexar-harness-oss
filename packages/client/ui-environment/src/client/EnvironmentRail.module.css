@@ -1,0 +1,139 @@
+/*
+ * The rail draws at its full width inside a track that eases between zero and
+ * that width; the column clips it, so the content never reflows mid-motion.
+ */
+.rail {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 12px 0 16px;
+}
+
+.title {
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+/* The same 28px circle icon button as the right Sidebar's header controls. */
+.iconButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 28px;
+  cursor: pointer;
+}
+
+.iconButton svg {
+  width: 15px;
+  height: 15px;
+}
+
+.iconButton:hover,
+.iconButton[aria-pressed='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px 16px;
+  overflow-y: auto;
+}
+
+.section {
+  padding: 12px 0;
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.section:first-child {
+  border-top: none;
+}
+
+.sectionTitle {
+  margin: 0 0 6px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+.value,
+.path,
+.muted,
+.empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+
+.value {
+  color: var(--dsw-alias-label-primary);
+}
+
+.path,
+.muted,
+.empty {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.path {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 12px 0;
+}
+
+.bar {
+  height: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  background: var(--dsw-alias-border-l3);
+  border-radius: 2px;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--dsw-alias-label-secondary);
+  border-radius: 2px;
+}
+
+.tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.task {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}

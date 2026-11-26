@@ -50,6 +50,7 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
   const saved = useStore(state => state.byTab[tab.id])
   const initial = useRef(saved)
   const initialUrl = useRef(tab.navigation.params?.url)
+  const initialPane = useRef(tab.navigation.params?.pane)
   const viewportId = useId()
   const [mountEpoch, setMountEpoch] = useState(0)
   const state = useBrowserState(tab.id)
@@ -62,6 +63,7 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
     const hide = mount({
       tabId: tab.id, signal: tab.signal, viewportId, applicationOrigin: window.location.origin,
       initial: initial.current, initialUrl: initialUrl.current,
+      ...initialPane.current === undefined ? {} : { initialPane: initialPane.current },
       openTab: (url) => { tab.actions.openTab('browser', { params: { url }, revealIfOpened: false }) },
     })
     setMountEpoch(value => value + 1)

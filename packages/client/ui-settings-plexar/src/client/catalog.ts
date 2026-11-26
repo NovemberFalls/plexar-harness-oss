@@ -50,6 +50,7 @@ export const FEATURE_GROUPS: readonly FeatureGroup[] = [
       { id: 'webSearch', nameKey: 'feature.webSearch.name', descriptionKey: 'feature.webSearch.description', tools: true },
       { id: 'browser', nameKey: 'feature.browserUse.name', descriptionKey: 'feature.browserUse.description', modules: [pkg('browser-use'), '@plexar/dsh-plexar/browser-bridge'] },
       { id: 'useMyChrome', nameKey: 'feature.useMyChrome.name', descriptionKey: 'feature.useMyChrome.description', tools: true },
+      { id: 'inAppBrowser', nameKey: 'feature.inAppBrowser.name', descriptionKey: 'feature.inAppBrowser.description', tools: true },
     ],
   },
   {

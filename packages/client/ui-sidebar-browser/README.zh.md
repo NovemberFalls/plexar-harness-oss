@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-在独立的右侧 Sidebar tab 中浏览 HTTP(S) 页面，包括 loopback 服务。Web 使用 iframe 和应用维护的 history；Desktop 使用 Electron `<webview>`、原生导航 history 和保活页面。本包不会向被访问内容注入 Electron 或 Node 能力。
+在独立的右侧 Sidebar tab 中浏览 HTTP(S) 页面，包括 loopback 服务。Web 使用 iframe 和应用维护的 history；Desktop 使用 Electron `<webview>`、原生导航 history 和保活页面；Plexar 桌面应用（Tauri）使用原生 pane，即放置在 tab 内容区上方的系统级浏览器视图。本包不会向被访问内容注入 Electron 或 Node 能力。
 
 ## 目录
 
@@ -40,9 +40,9 @@ Browser 在 Web profile 中默认禁用，在 Desktop 中默认启用。Web 用�
   disabled: false
 ```
 
-Client 插件可以调用 `ctx.sidebarRight.openTab('browser', { params: { url } })` 打开 tab。可选 URL 会在导航前接受与地址栏输入相同的校验。
+Client 插件可以调用 `ctx.sidebarRight.openTab('browser', { params: { url } })` 打开 tab。可选 URL 会在导航前接受与地址栏输入相同的校验。在 Tauri shell 下，也可以用 `params: { pane }` 打开 tab，它会接管一个已有的代理 pane（`browser_pane_adopt`）；该 pane 已不存在时，tab 的行为与未带任何参数时相同。
 
-工具栏提供后退、前进、刷新、前往和在系统浏览器中打开。Web 还提供逐 tab sandbox 开关；关闭它是临时选择，并会显示警告。Desktop 显示观察到的页面标题。重启后，Browser 展示保存的标题和 URL；只有点击恢复或刷新才打开该地址。
+工具栏提供后退、前进、刷新、前往和在系统浏览器中打开。Web 还提供逐 tab sandbox 开关；关闭它是临时选择，并会显示警告。Desktop 与 Tauri 原生 pane 显示观察到的页面标题。重启后，Browser 展示保存的标题和 URL；只有点击恢复或刷新才打开该地址。
 
 -----
 
@@ -62,9 +62,13 @@ Web 默认使用 `sandbox="allow-scripts allow-forms allow-same-origin allow-pop
 
 Web 记录 toolbar 提交和 typed tab 打开。导航状态机把每个受控 revision 的第一次 iframe load 视为已知，把后续 load 视为页面已经变化到不可读取 URL 的证据。进入 unknown 状态后，地址会显示标记，后退、前进和外部打开会禁用，刷新则返回最后一个受控 URL。body 重挂载时会重新加载应用最后已知的 URL，并且仅在尚无受控目标时使用可选初始 URL。不产生 iframe load 的 History API 与 fragment 变化仍不可见。iframe `error` event 会显示临时加载失败 notice，直到下一个受控加载，但不会改变 URL history。
 
+### 原生 pane 载体
+
+当 `globalThis.__TAURI__` 提供 `core.invoke` 和 `event.listen`（即设置了 `withGlobalTauri` 的 Plexar 桌面应用）时，`apply` 会选择原生载体，顺序在 Electron 之后、iframe 之前。pane 是主窗口的 WebView2 子 webview，由 shell（`apps/plexar-desktop`）持有；本包只通过 `src/client/native/bridge.ts` 访问它，该文件封装了 `browser_pane_*` 命令和 `plexar-browser:*` event。`NativePaneImpl` 是 `BrowserFrame`：在挂载并被要求加载时打开或接管 pane，把 pane 状态（URL、标题、加载中、history）映射为 frame 状态，不把 Chromium 的 `ERR_ABORTED` 视为错误，把 `open-requested` 的 popup 作为新 tab 转交 Sidebar，并在 shell 关闭 pane 后丢弃它、保留最后的地址，之后的挂载或刷新会打开新的 pane。`NativePanePresentation` 是 `BrowserPresentation`；因为 pane 不在 DOM 中，它会跟踪内容元素（`ResizeObserver`、`IntersectionObserver`、window 的 `resize` 与捕获阶段的 `scroll`），每个动画帧最多发送一次逻辑像素 bounds，且仅在变化时发送；元素被隐藏、脱离文档或移出屏幕、卸载以及 dispose 时发送 `visible: false`。URL 策略由 shell 执行，pane 不会加载 `file:`、带凭据的地址或 Web UI 自身的 origin。原生 tab 声明 `keepMounted`。启动时以及收到 `plexar-browser:agent-opened` 时，本包会为每个尚未提供的代理 pane 用 `params: { pane }` 打开一个 Browser tab，位于 Sidebar 当前显示的 Session。
+
 ### Controller
 
-每个 tab 的 `BrowserController` 负责地址校验、命令和显式恢复。`BrowserFrame` 提供与载体无关的导航状态；`IframeImpl` 使用 `BrowserNavigation`，`ElectronWebViewImpl` 观察 Chromium history。`BrowserPresentation` 负责 DOM 的物理挂载。Slot injection 提供 `useBrowserState` 和普通 callback，React body 不接收 provider 对象或 observable。
+每个 tab 的 `BrowserController` 负责地址校验、命令和显式恢复。`BrowserFrame` 提供与载体无关的导航状态；`IframeImpl` 使用 `BrowserNavigation`，`ElectronWebViewImpl` 观察 Chromium history；`NativePaneImpl` 报告 shell 的 pane 状态。`BrowserPresentation` 负责 DOM 的物理挂载。Slot injection 提供 `useBrowserState` 和普通 callback，React body 不接收 provider 对象或 observable。
 
 Desktop 主进程批准 guest 租约，并执行挂载、导航和权限策略。preload 只暴露限定范围的 Browser 操作。共享声明通过标准 `/types` 出口配合 `import type` 引入；Host 与 Client 使用独立 tsconfig 编译。Desktop Browser tab 声明 `keepMounted`，Sidebar 因而在切 tab、切 Session、收起与浮动期间保留其 DOM。
 
@@ -103,6 +107,9 @@ Desktop 主进程批准 guest 租约，并执行挂载、导航和权限策略�
 - 出于安全原因，浏览器会隐藏很多 iframe 失败：DNS、TLS、mixed-content、CSP 与 `X-Frame-Options` 失败可能触发 `load`，也可能不提供可操作 event，而不是触发 `error`。加载失败 notice 只能作为 best-effort 提示。
 - 只要 tab 仍在 Sidebar 布局中，保存的标题和 URL 就会跨刷新与插件卸载保留。关闭 tab 会删除其检查点。重启恢复不恢复页面内存、未保存的表单或 Chromium history 栈。
 - 本地文件会被拒绝，并继续由 Document Preview 负责。
+- 原生 pane 是绘制在整个 Web UI 上方的系统级视图，因此与 Browser tab 区域重叠的 Web UI 菜单和对话框会被它遮住。它的位置跟随内容元素，tab 被隐藏时 pane 也会隐藏。
+- 在原生 pane 中，shell 会拒绝 `<name>.localhost` 主机（Tauri 自身的本地 origin）以及位于 Web UI 端口上的任何 loopback 主机，因此运行在 `something.localhost` 上的开发站点无法在其中加载；其他端口上的普通 `localhost` 可以。
+- 原生 pane 仅限 Windows（WebView2）。代理的 Playwright 工具通过 loopback、无认证的 DevTools 端口驱动 pane；该端口与共享的登录 profile 见 `apps/plexar-desktop/README.md`。该载体有使用假 bridge 的单元测试；真实窗口行为只做过编译，没有自动化测试。
 - Desktop 按规范化的工作区 CWD 共享进程内存储分区；没有解析到 Workspace 的 Session 单独隔离。Cookie 与 Web storage 不跨应用重启保留。guest 权限、下载与原生 popup 均被拒绝；通过检查的 HTTP(S) popup 请求会打开 Sidebar tab。Host 地址过滤不是通用私网或 DNS-rebinding 防火墙。
 
 <a id="dev-note"></a>

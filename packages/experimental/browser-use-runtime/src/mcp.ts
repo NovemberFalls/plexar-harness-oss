@@ -88,6 +88,11 @@ export interface SessionMcpOptions {
    * The returned `close` runs when that Session's server is released or its start fails.
    */
   prepare?: (agent: Agent, signal: AbortSignal) => Promise<SessionMcpLaunch>
+  /**
+   * Whether one Agent gets a server at all; omission admits every Agent. A refused Agent starts no
+   * server and, like a blocked one, sees no browser tools, inherited ones included, and no instructions.
+   */
+  admit?: (agent: Agent) => boolean
 }
 
 /** One Session's server arguments chosen by `SessionMcpOptions.prepare`. */
@@ -193,7 +198,8 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
     }
   }, `${options.name}.sessions`)
   ctx.on('agent/created', async ({ agent, signal }) => {
-    const state: ClientState = { status: resources.available(agent) ? 'ready' : 'blocked' }
+    const admitted = options.admit?.(agent) ?? true
+    const state: ClientState = { status: admitted && resources.available(agent) ? 'ready' : 'blocked' }
     agent.ctx.effect(() => async () => {
       clients.delete(agent)
       await state.mask?.dispose()

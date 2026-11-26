@@ -214,7 +214,7 @@ describe('ui-settings-plexar apply', () => {
     const groups = face.hooks.features.getSnapshot().groups
     expect(groups.map(group => [group.title, group.rows.map(row => [row.id, row.enabled])])).toEqual([
       ['Coding', [['shell', true], ['files', false]]],
-      ['Web', [['webSearch', true], ['browser', true], ['useMyChrome', true]]],
+      ['Web', [['webSearch', true], ['browser', true], ['useMyChrome', true], ['inAppBrowser', true]]],
       ['Helper agents', [['subagents', true], ['workflows', true]]],
       ['Planning', [['todos', true], ['goals', true]]],
       ['Background work', [['jobs', true], ['skills', true]]],
@@ -222,6 +222,10 @@ describe('ui-settings-plexar apply', () => {
       ['Input', [['voiceInput', false]]],
     ])
     expect(groups[0]!.rows[0]!.name).toBe('Terminal commands')
+    // Use my Chrome only allows the person's Chrome when asked; the in-app browser is the default.
+    const chrome = groups[1]!.rows.find(row => row.id === 'useMyChrome')!
+    expect(chrome.name).toBe('Use my Chrome when I ask')
+    expect(chrome.description).toContain('when you ask it to')
     expect(groups.at(-1)!.rows[0]!.description).toContain('never leaves the machine')
   })
 

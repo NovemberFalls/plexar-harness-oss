@@ -49,6 +49,14 @@ type LayoutInfo = {
   rightbarFullscreen: boolean
   /** Suppress transitions for a fullscreen exit until another geometry action. */
   rightbarInstant: boolean
+  /**
+   * Whether the environment rail is asked for. A request, not a track: the
+   * frame still gives it none without an occupant, beside a fullscreen right
+   * panel, or when the center could not keep its minimum.
+   */
+  envbarShown: boolean
+  /** Whether an entry occupies the envbar slot; written from the slot subscription. */
+  envbarOccupied: boolean
 }
 
 /**
@@ -64,6 +72,10 @@ type LayoutActions = {
   setRightbar: (draft: LayoutState, px: number) => void
   openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
   closeRightbar: (draft: LayoutState) => void
+  openEnvbar: (draft: LayoutState) => void
+  closeEnvbar: (draft: LayoutState) => void
+  toggleEnvbar: (draft: LayoutState) => void
+  setEnvbarOccupied: (draft: LayoutState, occupied: boolean) => void
 }
 
 /**
@@ -88,6 +100,8 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         rightbarTrack: false,
         rightbarFullscreen: false,
         rightbarInstant: false,
+        envbarShown: false,
+        envbarOccupied: false,
       },
     }),
     actions: {
@@ -139,6 +153,21 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         d.layoutInfo.rightbarShown = false
         d.layoutInfo.rightbarTrack = false
         d.layoutInfo.rightbarFullscreen = false
+      },
+      openEnvbar: (d) => {
+        d.layoutInfo.rightbarInstant = false
+        d.layoutInfo.envbarShown = true
+      },
+      closeEnvbar: (d) => {
+        d.layoutInfo.rightbarInstant = false
+        d.layoutInfo.envbarShown = false
+      },
+      toggleEnvbar: (d) => {
+        d.layoutInfo.rightbarInstant = false
+        d.layoutInfo.envbarShown = !d.layoutInfo.envbarShown
+      },
+      setEnvbarOccupied: (d, occupied: boolean) => {
+        d.layoutInfo.envbarOccupied = occupied
       },
     },
   })

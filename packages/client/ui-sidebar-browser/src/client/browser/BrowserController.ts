@@ -26,6 +26,8 @@ export interface BrowserControllerOptions {
   readonly actions: BoundActions<BrowserStore>
   readonly createPage: BrowserPageFactory
   readonly openTab: (url: string) => void
+  /** Existing native pane to adopt instead of opening one. */
+  readonly initialPane?: string
 }
 
 /** Owns input validation and page lifetime without inspecting the carrier type. */
@@ -46,6 +48,7 @@ export class BrowserController implements HostObservable<BrowserControllerState>
     this.checkpoint = options.initial
     this.page = options.createPage({
       initial: options.initial,
+      ...options.initialPane === undefined ? {} : { pane: options.initialPane },
       persist: (state) => {
         if (this.disposed) return
         this.checkpoint = state
@@ -177,6 +180,8 @@ export interface BrowserMountRequest {
   readonly initial: BrowserTabState | undefined
   readonly initialUrl: string | undefined
   readonly openTab: (url: string) => void
+  /** Native pane named by the tab's `pane` parameter, if any. */
+  readonly initialPane?: string
 }
 
 /** Plain Slot callbacks and a framework-bound state source, not a desktop protocol. */

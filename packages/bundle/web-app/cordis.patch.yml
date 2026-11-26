@@ -346,6 +346,11 @@
     - id: ui-jobs
       name: '@deepseek-ai/dsh-client-ui-jobs'
 
+    # The environment rail right of the right Sidebar, and the Host read of
+    # the Session workspace's git branch behind it.
+    - id: ui-environment
+      name: '@deepseek-ai/dsh-client-ui-environment'
+
     # Read-only active Schedule catalog. The shipped Web graph resolves the
     # client package but leaves it disabled; the explicit Schedule overlay
     # enables this same row together with the host Schedule services.

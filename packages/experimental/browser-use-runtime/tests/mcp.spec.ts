@@ -61,7 +61,7 @@ class PresentationRuntime extends PtcRuntime {
   run(): Promise<never> { return Promise.reject(new Error('Unexpected PTC execution in a presentation test')) }
 }
 
-async function load(exclusive = false, mode?: string, toolCallTimeoutMs?: number, toolOrder?: string[]) {
+async function load(exclusive = false, mode?: string, toolCallTimeoutMs?: number, toolOrder?: string[], admit?: (agent: Agent) => boolean) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-browser-mcp-'))
   roots.push(root)
   const model = new FixtureModel()
@@ -70,7 +70,7 @@ async function load(exclusive = false, mode?: string, toolCallTimeoutMs?: number
     ['sessions', Sessions], ['agents', Agents], ['loop', AgentLoop], ['projections', Projections],
     ['model', { inject: ['llm'], apply(ctx: Context) { ctx.effect(() => ctx.llm.registerAdapter(['fixture'], model)) } }],
     ['browser', { inject: ['browserUse', 'agents', 'tools', 'systemPrompt'], apply(ctx: Context) {
-      mountSessionMcp(ctx, { name: 'browser-fixture', exclusive, command: process.execPath, args: [fixture, root, ...mode === undefined ? [] : [mode]], ...toolCallTimeoutMs === undefined ? {} : { toolCallTimeoutMs, env: {} } })
+      mountSessionMcp(ctx, { name: 'browser-fixture', exclusive, command: process.execPath, args: [fixture, root, ...mode === undefined ? [] : [mode]], ...toolCallTimeoutMs === undefined ? {} : { toolCallTimeoutMs, env: {} }, ...admit === undefined ? {} : { admit } })
     } }],
   ])
   const configPath = join(root, 'cordis.yml')
@@ -555,6 +555,36 @@ describe('Session MCP Loader composition', () => {
     expect(ctx.tools.schemas(owner.agent).some(tool => tool.name === TOOL)).toBe(true)
     expect((await execute(ctx, owner.agent)).content).toEqual([{ type: 'text', text: 'Visit 1: direct' }])
     await owner.dispose()
+  })
+
+  it('starts no server for a refused Agent and gives it no tools or instructions', async () => {
+    const { ctx, root } = await load(false, undefined, undefined, undefined, agent => agent.options.model === 'admitted')
+    const refused = await ctx.agents.create({ sessionId: SessionId('refused') })
+    await expect(readFile(join(root, 'events.ndjson'))).rejects.toMatchObject({ code: 'ENOENT' })
+    const child = await ctx.agents.create({
+      sessionId: SessionId('refused-child'), parentAgent: refused.agent, agentOptions: { model: 'admitted' },
+      setup: (_inner, agent) => { bindScopeParent(agent, refused.agent) },
+    })
+    const blocked = await warm(ctx, refused.agent)
+    expect(blocked.tools.some(tool => tool.name === TOOL)).toBe(false)
+    expect(renderPrompt(blocked)).not.toContain('BROWSER_FIXTURE_INSTRUCTION')
+    expect((await execute(ctx, refused.agent)).isError).toBe(true)
+    expect((await warm(ctx, child.agent)).tools.some(tool => tool.name === TOOL)).toBe(true)
+    expect((await execute(ctx, child.agent)).content).toEqual([{ type: 'text', text: 'Visit 1: direct' }])
+    expect((await events(root)).filter(event => event.event === 'initialize')).toHaveLength(1)
+  })
+
+  it('keeps the browser tools of an Agent whose inherited tools are all filtered out', async () => {
+    const { ctx } = await load()
+    registerIndependentTool(ctx)
+    const owner = await ctx.agents.create({
+      sessionId: SessionId('allow-nothing'),
+      setup: (inner) => { inner.tools.restrict({ allow: [] }) },
+    })
+    const tools = (await warm(ctx, owner.agent)).tools.map(tool => tool.name)
+    expect(tools).toContain(TOOL)
+    expect(tools).not.toContain('unrelated')
+    expect((await execute(ctx, owner.agent)).isError).toBe(false)
   })
 
   it('initializes only future activations after provider reload', async () => {

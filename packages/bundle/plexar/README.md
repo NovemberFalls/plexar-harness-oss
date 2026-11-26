@@ -81,7 +81,7 @@ desktop app's own updater or `https://harness.plexar.tech` instead.
 - **Rig key.** Off-loopback the rig requires a bearer. `PLEXAR_HARNESS_KEY` is minted (2026-09-22): rig key `key_9dfcca42cccd49db`, label
   "Plexar Harness", scope guest, models `*`, visible in the plexar-llm console key table.
   Stored in Len's Windows user env; new shells pick it up, existing ones need a restart.
-- **WireGuard.** The work VPN hijacks `the LAN subnet`; if the rig times out, drop the tunnel.
+- **WireGuard.** The work VPN hijacks `<rig-lan-address>/24`; if the rig times out, drop the tunnel.
 
 ## Studio (ACP over stdio, contract v2)
 
@@ -91,15 +91,41 @@ Contract: `docs/plexar/07-studio-api-contract.md`. Client Studio vendors: `studi
 (start, stop, list, resume, prompt, cancel, close, model, effort, approvals). After every upstream merge
 run `python packages/bundle/plexar/studio/check_api_drift.py`; exit 1 means the wire moved.
 
-## Use my Chrome
+## Browser routes
 
-The `plexar-browser-playwright` row loads `src/browser-bridge`, which serves the Playwright browser tools either in the person's own Chrome or Edge (through the Plexar Browser Bridge extension, `apps/plexar-browser-extension`) or in a browser window of the agent's own. The model sees the same tools either way.
+With `delegate` on (the default), the browser agent picks the route per `browse` call: see "The browser agent" below. The order here is the `delegate: false` behaviour.
 
-Config: `connectTimeoutMs` (default 20000; the Plexar row sets 60000 so a person has time to read the approval page and pick a tab) is how long the process's first Session waits for the extension to connect; `extensionIds` (default: the Chrome Web Store id `gnjeciecdiicngbfdancnklpnnmcekll`, then the load-unpacked development id `cnfgenfphpnhddlefhminclbbjdgkbbd`; each 32 letters a-p) lists the extensions in preference order: the first one installed is the one whose connect page is opened and whose `chrome-extension://` origin alone may use the relay's `/extension` path; `headless` (from `PLEXAR_BROWSER_HEADLESS=1`), `chromePath`, and `toolCallTimeoutMs` are optional.
+The `plexar-browser-playwright` row loads `src/browser-bridge`, which serves the Playwright browser tools through one of three routes, chosen per Session in this order: (1) the person's own Chrome or Edge, through the Plexar Browser Bridge extension (`apps/plexar-browser-extension`; Settings > Features `useMyChrome`); (2) the in-app browser, a native pane inside the Plexar desktop app's window (`inAppBrowser`); (3) a browser window of the agent's own. The model sees the same tools on every route. Both switches on means automatic: the extension first, then the pane. `useMyChrome` off leaves the in-app pane (desktop app only); `inAppBrowser` off leaves today's behaviour.
+
+Config: `connectTimeoutMs` (default 20000; the Plexar row sets 60000 so a person has time to read the approval page and pick a tab) is how long the process's first Session waits for the extension to connect; `extensionIds` (default: the Chrome Web Store id `gnjeciecdiicngbfdancnklpnnmcekll`, then the load-unpacked development id `cnfgenfphpnhddlefhminclbbjdgkbbd`; each 32 letters a-p) lists the extensions in preference order: the first one installed is the one whose connect page is opened and whose `chrome-extension://` origin alone may use the relay's `/extension` path; `inAppTimeoutMs` (default 15000) is how long a Session waits for the desktop app to bring an in-app pane up; `headless` (from `PLEXAR_BROWSER_HEADLESS=1`), `chromePath`, and `toolCallTimeoutMs` are optional.
 
 Per Session, while the Settings > Features switch `useMyChrome` is on, the plugin first checks every Chrome and Edge profile under the standard user-data directories for a `Preferences` or `Secure Preferences` file listing one of `extensionIds` under `extensions.settings` (store and load-unpacked installs). Not installed: it opens nothing, does not wait, and launches its own window. Installed: the process shares one relay on 127.0.0.1. The first Session starts it, opens the connect page once, and the extension shows the process as one colored tab group titled after the working directory. Every Session then attaches through its own relay client with its own random token, sees only the tabs it opened (the first connected Session also gets the connect page's tab and tabs the person drags into the group), and closes those tabs when it ends. When the process exits, is killed, or unloads the plugin, the extension closes every tab the agent opened and ungroups the person's own. If the extension disconnects, the next Session opens a new connect page. A miss (not installed, no browser found, or no connection in time) launches the agent's own window, logs one install hint to the person per activation, and is final for the process, so later Sessions open no further connect pages. `plexar-harness -p` sets `PLEXAR_UNATTENDED=1`, which skips the person's browser entirely and runs the agent's own browser headless.
 
 Upstream seams: `mountSessionMcp` in `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp` accepts a per-Session `prepare` that picks the server arguments and a `close`, and `playwrightMcpLaunch` in `@deepseek-ai/dsh-experimental-browser-use-playwright-mcp` builds launch or attach arguments. Both changes are listed in `CONTINUATION.md` under "Upstream lines we touch".
+
+### Route 2: the in-app browser
+
+Offered only when the Session is attended (not `plexar-harness -p`), the Features switch `inAppBrowser` is on, the extension route did not attach, and the Host runs under the desktop app, which sets `PLEXAR_INAPP_BROWSER_CDP` to `http://127.0.0.1:<port>` (Windows only; any other value is ignored). The Host writes `plexar shell: {"op":"browser.ensure","session":"<id>"}` on its stdout, where `<id>` is the Session id when the agent exposes one, else a random UUID. It then polls `<endpoint>/json/list` every 250 ms until it lists a page, and attaches Playwright to that endpoint. If no page appears within `inAppTimeoutMs` it writes `browser.release` and launches the agent's own window. When the Session ends the Host writes `browser.release` once, and the app closes the pane unless the person adopted it into a Browser tab. A pane attached this way logs no extension install hint.
+
+Limits, stated plainly: the agent cannot open a new tab itself on this route (WebView2 has no `Target.createTarget`); every Session's agent sees every in-app pane (one shared profile, no per-Session scoping, unlike the extension relay); the pane's CDP port is loopback only but unauthenticated, so any local process of the same user can attach while a pane is open; Windows only. The app side is described in `apps/plexar-desktop/README.md`. The route has unit tests for the endpoint check, the attach handshake and the route order; it has not been exercised against a live desktop window by an automated test.
+
+### The browser agent
+
+Browser tools are held by one dedicated agent, not by every agent. The top-level Session agent has a `browse` tool (a second `tool-subagent` row, `plexar-browse`, in `cordis.patch.yml`): "Hand a browsing goal to the browser agent." It starts a child with its own persona and `agentRole: browser`, and only that child gets the `mcp__playwright-mcp__*` tools. The top-level agent and children spawned through `subagent` or `subagent_fork` get none, and no browser process, relay session or `browser.ensure` line is started for them. The browser agent holds only its browser tools (`toolFilter: { allow: [] }` hides everything inherited), so it cannot spawn agents and has no `browse` tool (`maxDepth: 1`). `browse` stays visible under `toolProfile: 'lean'`.
+
+`browse` is one-shot: each call starts a fresh browser agent. The page survives between calls because the in-app pane is keyed by the top-level Session's id and released when that Session's agent is disposed.
+
+Which browser: `browse` takes an optional `browser` argument, `in_app` (default) or `my_chrome`. The default goes to the in-app pane, else a launched browser, and never contacts the extension relay. `my_chrome` uses the extension only when the Features switch "Use my Chrome when I ask" (`useMyChrome`) is on and the extension attaches; otherwise the call fails with a message and there is no fallback. This replaces the route order in "Browser routes" above, which still describes `delegate: false`.
+
+Config `delegate: boolean` on the `plexar-browser-playwright` row, default `true`. `false` restores the old behaviour exactly: every agent gets the browser tools, the old route order applies, and `browse` is denied for every agent, so the `plexar-browse` row can stay mounted.
+
+Page snapshots go to `<os tmp>/plexar-playwright-mcp/<Session id>`, never the workspace, and are not cleaned up. In `feature-toggles`, `useMyChrome` and `inAppBrowser` are always known ids, and an unknown `off` id is logged, not fatal.
+
+Limits: the mark is an agent option, not a tool filter by name, because the filter rejects names it does not know and the browser tools are registered per agent. Covered by `tests/browser-agent.spec.ts` with fakes. Live: see "Live smoke" in `CONTINUATION.md`; the agent acting inside the pane over CDP was not verified.
+
+### The Browser tab
+
+The bundle's own `cordis.patch.yml` carries a row `ui-sidebar-browser` with `disabled: false`, applied on every launch below the user's own patch. `web-app` leaves that tab off except for the `desktop` profile, and `profiles/plexar-web.patch.yml` is copied only on a profile's first install, so existing `plexar-web` profiles had no Browser tab. The profile patch keeps its two lines.
 
 ## Skills
 

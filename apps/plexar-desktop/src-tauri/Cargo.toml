@@ -9,7 +9,7 @@ publish = false
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["unstable"] }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 keyring = "4"
@@ -19,6 +19,12 @@ base64 = "0.22"
 ring = "0.17"
 tauri-plugin-updater = "2"
 tauri-plugin-dialog = "2"
+
+# In-app browser panes: WebView2 history state and navigation events (src/browser.rs), at the
+# versions wry already uses.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38.2"
+windows-core = "0.61.2"
 
 [profile.release]
 strip = true

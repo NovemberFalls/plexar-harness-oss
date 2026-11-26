@@ -703,6 +703,77 @@ describe('dsh-tool-subagent', () => {
     expect(seen?.maxDepth).toBe(2)
   })
 
+  it('replaces the provider wording with `description` and stamps `agentRole` on the child options', async () => {
+    let seen: { agentOptions?: unknown } | undefined
+    const ctx = await projectedContext()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SubagentRuntime)
+    ctx.subagents.registerProvider({
+      name: 'capture-role',
+      capabilities: { agentOptions: true, outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: async (request) => {
+        seen = request
+        return {
+          id: SessionId('capture-role-child'),
+          localAgent: undefined,
+          result: Promise.resolve({ output: [{ type: 'text', text: 'ok' }], stopReason: 'completed' as const }),
+          dispose: async () => {},
+        }
+      },
+    })
+    await ctx.plugin(tool, { provider: 'capture-role', maxDepth: 'provider-managed', description: 'Hand a goal over.', agentRole: 'browser' })
+
+    expect(ctx.tools.schemas().find(s => s.name === 'subagent')!.description).toMatch(/^Hand a goal over\. /u)
+    await callSubagent(ctx, { description: 'd', prompt: 'p' })
+    expect(seen?.agentOptions).toEqual({ subagentRole: 'browser' })
+  })
+
+  it('offers `variant` as an enum argument and stamps the chosen value, the first by default', async () => {
+    const seen: { agentOptions?: unknown }[] = []
+    const ctx = await projectedContext()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SubagentRuntime)
+    ctx.subagents.registerProvider({
+      name: 'capture-variant',
+      capabilities: { agentOptions: true, outputSchema: false, depthLimit: false, toolFilter: false, persona: false },
+      inheritsParentContext: false,
+      start: async (request) => {
+        seen.push(request)
+        return {
+          id: SessionId(`capture-variant-${seen.length}`),
+          localAgent: undefined,
+          result: Promise.resolve({ output: [{ type: 'text', text: 'ok' }], stopReason: 'completed' as const }),
+          dispose: async () => {},
+        }
+      },
+    })
+    await ctx.plugin(tool, {
+      provider: 'capture-variant', maxDepth: 'provider-managed', agentRole: 'browser',
+      variant: { parameter: 'browser', description: 'Which browser.', values: ['in_app', 'my_chrome'] },
+    })
+
+    const schema = ctx.tools.schemas().find(s => s.name === 'subagent')!
+    expect(JSON.stringify(schema.parameters)).toContain('"enum":["in_app","my_chrome"]')
+    await callSubagent(ctx, { description: 'd', prompt: 'p' })
+    await callSubagent(ctx, { description: 'd', prompt: 'p', browser: 'my_chrome' })
+    expect(seen.map(request => request.agentOptions)).toEqual([
+      { subagentRole: 'browser', subagentVariant: 'in_app' },
+      { subagentRole: 'browser', subagentVariant: 'my_chrome' },
+    ])
+    expect((await callSubagent(ctx, { description: 'd', prompt: 'p', browser: 'firefox' })).isError).toBe(true)
+    expect(seen).toHaveLength(2)
+  })
+
+  it('rejects `agentRole` on a provider without the agentOptions capability', async () => {
+    await expect(setup(
+      { provider: 'mock', maxDepth: 'provider-managed', agentRole: 'browser' },
+      { capabilities: { agentOptions: false } },
+    )).rejects.toThrow('does not support child agentOptions')
+  })
+
   it.each([
     { label: 'a string', value: '1' as unknown as number },
     { label: 'NaN', value: Number.NaN },

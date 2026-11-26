@@ -10,6 +10,7 @@ export type FeaturesLocaleKey =
   | 'feature.voiceInput.name' | 'feature.voiceInput.description'
   | 'feature.browserUse.name' | 'feature.browserUse.description'
   | 'feature.useMyChrome.name' | 'feature.useMyChrome.description'
+  | 'feature.inAppBrowser.name' | 'feature.inAppBrowser.description'
   | 'feature.agentTeams.name' | 'feature.agentTeams.description'
   | 'feature.shell.name' | 'feature.shell.description'
   | 'feature.files.name' | 'feature.files.description'
@@ -57,8 +58,10 @@ export const featuresEn: Record<FeaturesLocaleKey, string> = {
   'feature.voiceInput.description': 'Adds a microphone beside Send. Speak, press Stop, and your words appear in the message box to edit before sending. Speech is transcribed on this computer by a small local model (about 240 MB, downloaded once); audio never leaves the machine.',
   'feature.browserUse.name': 'Browser',
   'feature.browserUse.description': 'Lets the agent open a real Chromium browser: visit pages, click, fill forms, take screenshots and read console output. Useful for testing web apps and checking what a page actually shows.',
-  'feature.useMyChrome.name': 'Use my Chrome',
-  'feature.useMyChrome.description': 'Lets the agent work in your own Chrome through the Plexar Browser Bridge extension. Off: it uses its own browser window.',
+  'feature.useMyChrome.name': 'Use my Chrome when I ask',
+  'feature.useMyChrome.description': 'Allows the agent to use your own Chrome, through the Plexar Browser Bridge extension, when you ask it to. Otherwise it uses the in-app browser.',
+  'feature.inAppBrowser.name': 'In-app browser',
+  'feature.inAppBrowser.description': 'Lets the agent browse in a Browser tab inside this window when your Chrome is not connected. Off: it uses its own browser window. Desktop app only.',
   'feature.agentTeams.name': 'Agent Teams',
   'feature.agentTeams.description': 'Experimental. Lets the agent start a small team of helper agents that share a task board and work on parts of a job in parallel. Uses more of the model and takes longer; best for large, splittable tasks.',
   'group.coding': 'Coding',
@@ -105,8 +108,10 @@ export const featuresZh: Record<FeaturesLocaleKey, string> = {
   'feature.voiceInput.description': '在发送按钮旁添加麦克风。说话后点击停止，文字会出现在输入框中供编辑后发送。语音由本机上的小型本地模型转写（约 240 MB，只下载一次），音频不会离开本机。',
   'feature.browserUse.name': '浏览器',
   'feature.browserUse.description': '允许代理打开真实的 Chromium 浏览器：访问页面、点击、填写表单、截图并读取控制台输出。适合测试网页应用，查看页面实际显示的内容。',
-  'feature.useMyChrome.name': '使用我的 Chrome',
-  'feature.useMyChrome.description': '让代理通过 Plexar Browser Bridge 扩展在你自己的 Chrome 中工作。关闭时，它使用自己的浏览器窗口。',
+  'feature.useMyChrome.name': '在我要求时使用我的 Chrome',
+  'feature.useMyChrome.description': '允许代理在你要求时，通过 Plexar Browser Bridge 扩展使用你自己的 Chrome。否则它使用应用内浏览器。',
+  'feature.inAppBrowser.name': '应用内浏览器',
+  'feature.inAppBrowser.description': '当你的 Chrome 未连接时，让代理在本窗口内的浏览器标签页中浏览。关闭时，它使用自己的浏览器窗口。仅限桌面应用。',
   'feature.agentTeams.name': '代理团队',
   'feature.agentTeams.description': '实验功能。允许代理启动一个小型助手团队，共享任务看板，并行处理任务的不同部分。会消耗更多模型用量、耗时更长，适合大型、可拆分的任务。',
   'group.coding': '编程',

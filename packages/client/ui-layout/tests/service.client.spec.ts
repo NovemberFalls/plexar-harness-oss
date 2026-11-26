@@ -12,6 +12,10 @@ function fakePanels(): PanelActions {
     setRightbar: vi.fn(),
     openRightbar: vi.fn(),
     closeRightbar: vi.fn(),
+    openEnvbar: vi.fn(),
+    closeEnvbar: vi.fn(),
+    toggleEnvbar: vi.fn(),
+    setEnvbarOccupied: vi.fn(),
   }
 }
 
@@ -100,5 +104,20 @@ describe('LayoutController', () => {
     service.dispose()
     expect(pending.aborted).toBe(true)
     service.dispose()
+  })
+})
+
+describe('LayoutController environment rail', () => {
+  it('forwards rail requests to the store actions', () => {
+    const panels = fakePanels()
+    const service = new LayoutController(panels, () => true)
+    service.openEnvbar()
+    service.toggleEnvbar()
+    service.closeEnvbar()
+    expect(panels.openEnvbar).toHaveBeenCalledTimes(1)
+    expect(panels.toggleEnvbar).toHaveBeenCalledTimes(1)
+    expect(panels.closeEnvbar).toHaveBeenCalledTimes(1)
+    expect(panels.openRightbar).not.toHaveBeenCalled()
+    expect(panels.setEnvbarOccupied).not.toHaveBeenCalled()
   })
 })

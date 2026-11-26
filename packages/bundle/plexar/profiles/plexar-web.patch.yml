@@ -28,3 +28,7 @@
   disabled: true
 - id: ui-settings-plugins
   disabled: true
+# The right-Sidebar Browser tab. In the desktop app it is the native in-app pane the agent can
+# also drive; in a plain browser it is the sandboxed iframe.
+- id: ui-sidebar-browser
+  disabled: false

@@ -8,6 +8,8 @@ export interface BrowserPageOptions {
   readonly initial: BrowserTabState | undefined
   readonly persist: (state: BrowserTabState) => void
   readonly openRequested: (url: string) => void
+  /** Existing native pane this tab was opened to show; other providers ignore it. */
+  readonly pane?: string
 }
 
 /** The owning controller disposes frame; UI mounts only presentation. */

@@ -5,7 +5,8 @@
  * the per-session active view dissolved into ui-conversation's session store
  * (its only consumer). What remains here is the contract other plugins'
  * apply worlds reach for panel transitions (main-panel selection and sidebar toggle,
- * right-panel show/hide from ui-sidebar-right) — writes stay inside the
+ * right-panel show/hide from ui-sidebar-right, environment rail from
+ * ui-environment) — writes stay inside the
  * store's declared action set, shared with the root registration.
  */
 import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
@@ -49,6 +50,12 @@ export interface ILayout {
   openRightbar(track: boolean, fullscreen: boolean): void
   /** Report the right panel as hidden: no track, no handle. */
   closeRightbar(): void
+  /** Ask for the environment rail right of the right column. */
+  openEnvbar(): void
+  /** Hide the environment rail. */
+  closeEnvbar(): void
+  /** Flip the environment rail between shown and hidden. */
+  toggleEnvbar(): void
 }
 
 /** Cross-plugin panel-action face (ctx.layout). */
@@ -98,5 +105,20 @@ export class LayoutController implements ILayout {
   /** Report the right panel as hidden: no track, no handle. */
   closeRightbar(): void {
     this.panels.closeRightbar()
+  }
+
+  /** Ask for the environment rail. */
+  openEnvbar(): void {
+    this.panels.openEnvbar()
+  }
+
+  /** Hide the environment rail. */
+  closeEnvbar(): void {
+    this.panels.closeEnvbar()
+  }
+
+  /** Flip the environment rail between shown and hidden. */
+  toggleEnvbar(): void {
+    this.panels.toggleEnvbar()
   }
 }

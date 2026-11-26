@@ -233,7 +233,7 @@ export function apply(): void {}
 - **Source mode needs the repo tsconfig.** `pnpm dsh` resolves `@deepseek-ai/*` to `src/` through tsconfig paths. Running from another cwd requires `TSX_TSCONFIG_PATH=<repo>/tsconfig.json` and the absolute tsx loader path (`node --import file:///<repo>/node_modules/tsx/dist/esm/index.mjs <repo>/apps/cli/src/bin.ts --profile plexar "<task>"`).
 - **`typert-loader` warns "1 entry did not activate"** in source mode because `lib/typert.host.js` is unbuilt -- harmless for headless runs, goes away with a built `lib/`.
 - **Rig key.** Off-loopback, the rig requires a bearer (`PLEXAR_HARNESS_KEY`).
-- **WireGuard.** The work VPN hijacks `the LAN subnet`; if the rig times out, drop the tunnel.
+- **WireGuard.** The work VPN hijacks `<rig-lan-address>/24`; if the rig times out, drop the tunnel.
 
 Installing a bundle as a plugin author (`packages/bundle/plexar/README.md`):
 

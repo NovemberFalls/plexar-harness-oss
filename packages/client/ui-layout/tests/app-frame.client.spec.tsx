@@ -679,3 +679,59 @@ describe('AppFrame frame measurement lifecycle', () => {
     expect(animationFrames.size).toBe(0)
   })
 })
+
+/* Four-track template while the envbar slot is occupied: [sidebar, rightbar growth limit, rail]. */
+function railTracks(frame: HTMLElement): number[] {
+  const match = /^([\d.]+)px minmax\((0|400)px, 1fr\) minmax\(0px, ([\d.]+)px\) ([\d.]+)px$/.exec(frame.style.gridTemplateColumns)
+  if (match === null) throw new Error(`unexpected template: ${frame.style.gridTemplateColumns}`)
+  return [Number(match[1]), Number(match[3]), Number(match[4])]
+}
+
+describe('AppFrame environment rail', () => {
+  it('keeps the three-track template and renders no rail column without an occupant', () => {
+    const { frame, instance, slotCalls } = mountFrame()
+    act(() => { instance.actions.openEnvbar() })
+    expect(tracks(frame)).toEqual([280, 0])
+    expect(frame.querySelector('[data-envbar-col]')).toBeNull()
+    expect(slotCalls.some(c => c.key === 'envbar')).toBe(true)
+  })
+
+  it('renders a fourth track with an occupant: zero while hidden, 280px while shown', () => {
+    const { frame, instance, getByTestId } = mountFrame()
+    act(() => { instance.actions.setEnvbarOccupied(true) })
+    expect(railTracks(frame)).toEqual([280, 0, 0])
+    expect(frame.querySelector('[data-envbar-col]')?.contains(getByTestId('envbar-content'))).toBe(true)
+    expect(frame.dataset.envbarCollapsed).toBe('true')
+    act(() => { instance.actions.toggleEnvbar() })
+    expect(railTracks(frame)).toEqual([280, 0, 280])
+    expect(frame.dataset.envbarCollapsed).toBeUndefined()
+    act(() => { instance.actions.toggleEnvbar() })
+    expect(railTracks(frame)).toEqual([280, 0, 0])
+  })
+
+  it('moves the right column and its handle left by the rail width', () => {
+    const { frame, instance, rightOwner } = mountFrame()
+    act(() => { instance.actions.setEnvbarOccupied(true); instance.actions.openRightbar(true, false) })
+    expect(handleFor(frame, 'rightbar').style.left).toBe(`${1920 - 864}px`)
+    act(() => { instance.actions.openEnvbar() })
+    expect(railTracks(frame)).toEqual([280, 864, 280])
+    expect(rightOwner()).toEqual({ width: 864, viewportWidth: 1920, canShow: true })
+    expect(handleFor(frame, 'rightbar').style.left).toBe(`${1920 - 280 - 864}px`)
+    expect(frame.querySelectorAll('[data-side]')).toHaveLength(2)
+  })
+
+  it('drops the rail track beside a fullscreen right panel and on a frame too narrow for the centre', () => {
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.setEnvbarOccupied(true); instance.actions.openEnvbar() })
+    act(() => { instance.actions.openRightbar(true, true) })
+    expect(railTracks(frame)[2]).toBe(0)
+    act(() => { instance.actions.closeRightbar() })
+    expect(railTracks(frame)[2]).toBe(280)
+    // Below the auto-collapse breakpoint the sidebar is the 56px rail: 735 - 56 - 400 < 280.
+    resize(735)
+    expect(railTracks(frame)[2]).toBe(0)
+    expect(instance.getSnapshot().layoutInfo.envbarShown).toBe(true)
+    resize(1300)
+    expect(railTracks(frame)[2]).toBe(280)
+  })
+})

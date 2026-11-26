@@ -53,13 +53,14 @@ async function boot() {
   }
   ctx.provide('sidebarRightTabs', tabs as never)
   const openTabs = createSnapshotStore<readonly { sessionId: string; tabId: TabId }[]>([])
-  ctx.provide('sidebarRight', { openTabs } as never)
+  const openTab = vi.fn()
+  ctx.provide('sidebarRight', { openTabs, openTab } as never)
   ctx.provide('workspaces', { list: createSnapshotStore({ phase: 'ready', items: [] }) } as never)
   ctx.provide('slots', slots as never)
   ctx.provide('locale', locale as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   await fiber.await()
-  return { tabs, registered, dictionaries, fiber, openTabs }
+  return { tabs, registered, dictionaries, fiber, openTabs, openTab }
 }
 
 describe('ui-sidebar-browser apply', () => {
@@ -133,6 +134,63 @@ describe('ui-sidebar-browser apply', () => {
     const browser = injectFace('session', { replace: vi.fn(), forget: vi.fn() }) as BrowserInjected
     expect(browser.keyedHooks.browserState('missing')).toBeUndefined()
     expect(typeof browser.mount).toBe('function')
+  })
+
+  it('uses the native pane carrier only when the Tauri globals are present', async () => {
+    const listeners = new Map<string, (event: { payload: unknown }) => void>()
+    const unlisten = vi.fn()
+    const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
+      if (command === 'browser_pane_list') return [{ id: 'browser-pane-1', owner: 'agent' }, { id: 'browser-pane-2', owner: 'ui' }]
+      if (command === 'browser_pane_open') return { id: 'browser-pane-3', url: 'about:blank', title: '', loading: false,
+        canGoBack: false, canGoForward: false, owner: 'ui' }
+      return args === undefined ? undefined : null
+    })
+    vi.stubGlobal('__TAURI__', { core: { invoke }, event: {
+      listen: vi.fn(async (event: string, handler: (event: { payload: unknown }) => void) => {
+        listeners.set(event, handler)
+        return unlisten
+      }),
+    } })
+    const h = await boot()
+    expect(h.tabs.get(BROWSER_KIND)?.keepMounted).toBe(true)
+    await vi.waitFor(() => { expect(h.openTab).toHaveBeenCalledExactlyOnceWith('browser', { params: { pane: 'browser-pane-1' } }) })
+    listeners.get('plexar-browser:agent-opened')!({ payload: { id: 'browser-pane-1', session: 's1' } })
+    listeners.get('plexar-browser:agent-opened')!({ payload: { id: 'browser-pane-4', session: 's2' } })
+    expect(h.openTab).toHaveBeenLastCalledWith('browser', { params: { pane: 'browser-pane-4' } })
+    expect(h.openTab).toHaveBeenCalledTimes(2)
+    const injectFace = h.registered.find(entry => entry.name === 'sidebar.right.pane.tab')!.inject as
+      (sessionId: string, actions: Parameters<BrowserInjected['rebind']>[0]) => BrowserInjected
+    const controller = injectFace('session', createBrowserStore().create('apply-native').actions)
+    const host = document.createElement('div')
+    host.id = 'browser-apply-native'
+    document.body.append(host)
+    try {
+      controller.mount({ tabId: 'native-tab' as TabId, signal: new AbortController().signal, viewportId: host.id,
+        applicationOrigin: 'https://dsh.example', initial: undefined, initialUrl: 'https://example.test/', openTab: vi.fn() })
+      await vi.waitFor(() => { expect(invoke).toHaveBeenCalledWith('browser_pane_open', { url: 'https://example.test/' }) })
+      expect(host.querySelector('iframe')).toBeNull()
+      await h.fiber.dispose()
+      expect(invoke).toHaveBeenCalledWith('browser_pane_close', { id: 'browser-pane-3' })
+      expect(unlisten).toHaveBeenCalled()
+    } finally {
+      host.remove()
+    }
+  })
+
+  it('prefers the Electron carrier over the Tauri globals and the iframe without either', async () => {
+    const invoke = vi.fn()
+    vi.stubGlobal('__TAURI__', { core: { invoke }, event: { listen: vi.fn(async () => () => {}) } })
+    vi.stubGlobal('dshDesktop', { protocolVersion: 1, browser: {
+      acquire: vi.fn(async () => ({ lease: 'lease' as DesktopBrowserLeaseId, partition: 'partition' })),
+      release: vi.fn(async () => {}), onOpenRequested: vi.fn(() => () => {}),
+    } satisfies DesktopBrowserBridge })
+    const electron = await boot()
+    expect(electron.tabs.get(BROWSER_KIND)?.keepMounted).toBe(true)
+    expect(invoke).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+    vi.stubGlobal('__TAURI__', { core: {} })
+    const web = await boot()
+    expect(web.tabs.get(BROWSER_KIND)?.keepMounted).toBe(false)
   })
 
   it('removes every registration when the plugin is disposed', async () => {

@@ -280,6 +280,20 @@
   overflow: visible;
 }
 
+/* The environment rail: a real track (never an overlay), so showing it moves
+   the right column's edge left. It clips its occupant while the track eases
+   to or from zero, and paints its own ground and separator. */
+.envbarCol {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  border-left: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.frame[data-envbar-collapsed] .envbarCol {
+  border-left: none;
+}
+
 .overlayLayer {
   position: absolute;
   inset: 0;

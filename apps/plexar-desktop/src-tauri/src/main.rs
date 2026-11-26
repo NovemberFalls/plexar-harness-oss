@@ -41,9 +41,15 @@
 //! redirects the browser to that listener's `/callback`. `sign_in_google` waits up to 5 minutes,
 //! answers the browser with a small HTML page, and exchanges a returned code at
 //! `/api/harness/token`. `cancel_sign_in` aborts an in-flight wait and frees the port.
+//!
+//! **In-app browser.** `browser.rs` owns the browser panes: child webviews of `main` in their own
+//! profile, with a loopback debugging port passed to every Host child as
+//! `PLEXAR_INAPP_BROWSER_CDP` (Windows only). The stdout reader hands every `plexar shell: <json>`
+//! line to it, before and after navigation; the panes close when the Host child exits.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod auth;
+mod browser;
 mod google;
 
 use std::io::{BufRead, BufReader};
@@ -455,6 +461,10 @@ fn spawn_host_process(key: &str) -> Result<Child, String> {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    // In-app browser panes (SPEC 1.1): Windows only; absent means the Host has no in-app route.
+    if let Some(endpoint) = browser::cdp_endpoint() {
+        command.env(browser::CDP_ENV, endpoint);
+    }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -487,11 +497,17 @@ fn run_host_once(app: &tauri::AppHandle, mut child: Child) -> (std::process::Exi
     let navigated_sink = navigated.clone();
     let stdout_thread = thread::spawn(move || {
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            // plexar shell: <json> lines are handled for the whole life of the Host child.
+            if line.starts_with(browser::SHELL_LINE_PREFIX) {
+                browser::handle_shell_line(&handle, &line);
+                continue;
+            }
             if *navigated_sink.lock().unwrap() {
                 continue;
             }
             if let Some(url) = line.strip_prefix("dsh web: ") {
                 if let (Some(window), Ok(url)) = (handle.get_webview_window("main"), Url::parse(url.trim())) {
+                    browser::set_host_url(&handle, &url);
                     let _ = window.navigate(url);
                     *navigated_sink.lock().unwrap() = true;
                 }
@@ -501,6 +517,8 @@ fn run_host_once(app: &tauri::AppHandle, mut child: Child) -> (std::process::Exi
 
     let status = child.wait().expect("wait on Host child");
     let _ = stdout_thread.join();
+    // Panes do not outlive the Host child that may be driving them (any exit, including 75).
+    browser::close_all(app);
     let _ = stderr_thread.join();
     let did_navigate = *navigated.lock().unwrap();
     let reason = last_err.lock().unwrap().clone();
@@ -640,14 +658,32 @@ fn main() {
             signin_cancel: Arc::new(Mutex::new(None)),
             pending_code_signin: Arc::new(Mutex::new(None)),
         })
+        .manage(browser::Browser::default())
         .invoke_handler(tauri::generate_handler![
             host_status,
             sign_in_google,
             cancel_sign_in,
             start_code_sign_in,
             sign_in_code,
-            sign_out
+            sign_out,
+            browser::browser_pane_open,
+            browser::browser_pane_adopt,
+            browser::browser_pane_navigate,
+            browser::browser_pane_command,
+            browser::browser_pane_set_bounds,
+            browser::browser_pane_close,
+            browser::browser_pane_list
         ])
+        // A new top-level page in the main webview (a Web UI reload): the page that positioned
+        // the panes is gone, so session-less panes close and agent panes are hidden and handed
+        // back to the agent. Off the event loop, since closing a webview from inside another
+        // webview's callback is not safe.
+        .on_page_load(|webview, payload| {
+            if webview.label() == "main" && payload.event() == tauri::webview::PageLoadEvent::Started {
+                let handle = webview.app_handle().clone();
+                thread::spawn(move || browser::reset_for_reload(&handle));
+            }
+        })
         // One `setup` hook: a second `.setup` call replaces the first instead of adding to it.
         .setup(|app| {
             // `resource_dir()` needs the app handle, so it is resolved once here rather than at

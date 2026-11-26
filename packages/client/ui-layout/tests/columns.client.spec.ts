@@ -51,3 +51,26 @@ describe('computeColumns', () => {
     expect(computeColumns(1920, 0, 0).rightbar).toBe(0)
   })
 })
+
+describe('computeColumns with the environment rail', () => {
+  it('reserves the rail before the right column bids', () => {
+    expect(computeColumns(1920, 280, 864, 56, 280)).toEqual({ sidebar: 280, center: 496, rightbar: 864, envbar: 280 })
+    expect(computeColumns(1500, 280, 864, 56, 280)).toEqual({ sidebar: 280, center: 400, rightbar: 540, envbar: 280 })
+  })
+
+  it('takes the rail track when the right panel cannot fit beside it', () => {
+    expect(computeColumns(1200, 280, 864, 56, 280)).toEqual({ sidebar: 280, center: 640, rightbar: 0, envbar: 280 })
+  })
+
+  it('gives the rail no track when the center would drop below its minimum, leaving the three-column solve', () => {
+    expect(computeColumns(959, 280, 864, 56, 280)).toEqual(computeColumns(959, 280, 864))
+    expect(computeColumns(960, 280, 0, 56, 280)).toEqual({ sidebar: 280, center: 400, rightbar: 0, envbar: 280 })
+  })
+
+  it('is the three-column solve exactly while hidden', () => {
+    for (const viewport of [455, 1024, 1300, 1920]) {
+      expect(computeColumns(viewport, 280, 864, 56, 0)).toEqual(computeColumns(viewport, 280, 864))
+      expect(computeColumns(viewport, 280, 864, 56, 0)).not.toHaveProperty('envbar')
+    }
+  })
+})
